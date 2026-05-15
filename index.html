@@ -216,6 +216,7 @@ body.no-session #bar,body.no-session #main{display:none;}
 .login-card select,.login-card input{width:100%;}
 .login-btn{width:100%;margin-top:6px;}
 .login-err{color:#B91C1C;font-size:11px;min-height:14px;margin-bottom:6px;}
+.login-hint{font-size:11px;color:var(--gr);font-style:italic;margin-bottom:8px;min-height:14px;}
 .login-note{font-size:11px;color:var(--gr);margin-top:14px;text-align:center;line-height:1.4;}
 .user-widget{display:flex;align-items:center;gap:6px;padding:0 4px;}
 .user-widget .user-name{font-size:12px;color:var(--bk);font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -320,10 +321,11 @@ body.readonly .readonly-banner{display:block;}
 <div class="login-view">
 <div class="login-hd">🛒 Shopee PM Hub</div>
 <div class="login-sub">Sign in to continue</div>
-<div class="form-row"><label>User</label><select id="login-user"></select></div>
-<div class="form-row"><label>Password</label><input type="password" id="login-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<div class="form-row"><label>User</label><select id="login-user" onchange="onLoginUserChange()"></select></div>
+<div class="form-row" id="login-pwd-row"><label>Password</label><input type="password" id="login-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<div class="login-hint" id="login-hint"></div>
 <div class="login-err" id="login-err"></div>
-<button class="btn btn-p login-btn" onclick="doLogin()">Sign in</button>
+<button class="btn btn-p login-btn" id="login-btn" onclick="doLogin()">Sign in</button>
 <div class="login-note" id="login-note"></div>
 </div>
 <div class="bootstrap-view">
@@ -367,8 +369,8 @@ body.readonly .readonly-banner{display:block;}
 <div class="sm-modal-body">
 <div class="form-row mb-8"><label>Display Name *</label><input type="text" id="um-name" placeholder="e.g. Iago Uccio"></div>
 <div class="form-row mb-8"><label>PM Identifier <span style="font-weight:normal;color:var(--gr)">(matches p.pm — leave empty for read-only L1)</span></label><input type="text" id="um-pm" placeholder="e.g. Iago"></div>
-<div class="form-row mb-8"><label>Level *</label><select id="um-level"><option value="L1">L1 — Regular PM (scoped to own projects)</option><option value="L2">L2 — Admin (full access)</option></select></div>
-<div class="form-row mb-8"><label>Password</label><input type="password" id="um-pwd" placeholder="min 4 chars"></div>
+<div class="form-row mb-8"><label>Level *</label><select id="um-level" onchange="onUserLevelChange()"><option value="L1">L1 — Regular PM (no password, scoped to own projects)</option><option value="L2">L2 — Admin (password required, full access)</option></select></div>
+<div class="form-row mb-8" id="um-pwd-row"><label>Password <span style="font-weight:normal;color:var(--gr)" id="um-pwd-hint">(L2 only)</span></label><input type="password" id="um-pwd" placeholder="min 4 chars"></div>
 <div id="um-err" style="color:#B91C1C;font-size:11px;margin-top:6px;"></div>
 </div>
 <div class="sm-modal-ft"><button class="btn btn-d btn-sm" id="um-del-btn" onclick="deleteUser()" style="display:none">Delete</button><button class="btn btn-g btn-sm" onclick="closeUserModal()">Cancel</button><button class="btn btn-p btn-sm" onclick="saveUser()">Save</button></div></div></div>
@@ -1215,7 +1217,28 @@ function populateLoginUsers(){
     return;
   }
   document.body.classList.remove('no-users');
-  sel.innerHTML=users.map(u=>'<option value="'+u.id+'">'+u.name+' ('+u.level+')</option>').join('');
+  const sorted=users.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML=sorted.map(u=>'<option value="'+u.id+'">'+u.name+' ('+u.level+')</option>').join('');
+  onLoginUserChange();
+}
+function onLoginUserChange(){
+  const userId=document.getElementById('login-user')?.value;
+  const u=userId?users.find(x=>x.id===userId):null;
+  const pwdRow=document.getElementById('login-pwd-row');
+  const hint=document.getElementById('login-hint');
+  const btn=document.getElementById('login-btn');
+  if(!u||!pwdRow||!hint||!btn)return;
+  if(u.level==='L1'){
+    pwdRow.style.display='none';
+    hint.textContent='Direct access — no password required for L1';
+    btn.textContent='Enter as '+u.name;
+  }else{
+    pwdRow.style.display='';
+    hint.textContent='';
+    btn.textContent='Sign in';
+    setTimeout(()=>document.getElementById('login-pwd')?.focus(),40);
+  }
+  document.getElementById('login-err').textContent='';
 }
 async function doBootstrap(){
   const name=document.getElementById('bs-name').value.trim();
@@ -1254,11 +1277,13 @@ async function doLogin(){
   const errEl=document.getElementById('login-err');errEl.textContent='';
   if(!users.length){errEl.textContent='No users configured.';return;}
   const userId=document.getElementById('login-user').value;
-  const pwd=document.getElementById('login-pwd').value;
   const u=users.find(x=>x.id===userId);
   if(!u){errEl.textContent='User not found.';return;}
-  const h=await sha256(pwd);
-  if(h!==u.passwordHash){errEl.textContent='Incorrect password.';document.getElementById('login-pwd').select();return;}
+  if(u.level==='L2'){
+    const pwd=document.getElementById('login-pwd').value;
+    const h=await sha256(pwd);
+    if(h!==u.passwordHash){errEl.textContent='Incorrect password.';document.getElementById('login-pwd').select();return;}
+  }
   session={userId:u.id,name:u.name,level:u.level,pm:u.pm||''};
   saveSession();
   document.getElementById('login-pwd').value='';
@@ -1295,8 +1320,24 @@ function openUserModal(id){
   document.getElementById('um-err').textContent='';
   const canDelete=id&&session&&id!==session.userId;
   document.getElementById('um-del-btn').style.display=canDelete?'':'none';
+  onUserLevelChange();
   document.getElementById('user-modal').classList.remove('hidden');
   setTimeout(()=>document.getElementById('um-name').focus(),60);
+}
+function onUserLevelChange(){
+  const level=document.getElementById('um-level')?.value;
+  const row=document.getElementById('um-pwd-row');
+  const hint=document.getElementById('um-pwd-hint');
+  const u=userEditId?users.find(x=>x.id===userEditId):null;
+  if(!row||!hint)return;
+  if(level==='L1'){
+    row.style.display='none';
+  }else{
+    row.style.display='';
+    if(u&&u.level==='L1')hint.textContent='(required — upgrading to L2)';
+    else if(u)hint.textContent='(leave empty to keep current)';
+    else hint.textContent='(required for L2)';
+  }
 }
 function closeUserModal(){document.getElementById('user-modal').classList.add('hidden');userEditId=null;}
 async function saveUser(){
@@ -1307,16 +1348,22 @@ async function saveUser(){
   const err=document.getElementById('um-err');err.textContent='';
   if(!name){err.textContent='Name required';return;}
   if(level!=='L1'&&level!=='L2'){err.textContent='Invalid level';return;}
-  if(!userEditId&&pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
-  if(pwd&&pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
+  if(level==='L2'){
+    const existing=userEditId?users.find(x=>x.id===userEditId):null;
+    const needsPwd=!existing||existing.level==='L1'||!existing.passwordHash;
+    if(needsPwd&&pwd.length<4){err.textContent='Password (4+ chars) required for L2';return;}
+    if(pwd&&pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
+  }
   if(userEditId){
     const u=users.find(x=>x.id===userEditId);
     if(!u){err.textContent='User not found';return;}
     u.name=name;u.pm=pm;u.level=level;
-    if(pwd)u.passwordHash=await sha256(pwd);
+    if(level==='L1')u.passwordHash='';
+    else if(pwd)u.passwordHash=await sha256(pwd);
     if(session&&u.id===session.userId){session.name=name;session.level=level;session.pm=pm;saveSession();applySessionUI();}
   }else{
-    users.push({id:uid(),name,level,pm,passwordHash:await sha256(pwd)});
+    const hash=level==='L2'?await sha256(pwd):'';
+    users.push({id:uid(),name,level,pm,passwordHash:hash});
   }
   saveU();closeUserModal();renderUsers();toast('User saved — download data.json to persist','success');
 }
