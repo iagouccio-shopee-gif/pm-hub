@@ -363,6 +363,17 @@ body.readonly .readonly-banner{display:block;}
 </div>
 <div class="sm-modal-ft"><button class="btn btn-g btn-sm" onclick="document.getElementById('shortcuts-modal').classList.add('hidden')">Close</button></div></div></div>
 
+<div id="user-modal" class="sm-modal-bg hidden">
+<div class="sm-modal"><div class="sm-modal-hd" id="um-title">Add User</div>
+<div class="sm-modal-body">
+<div class="form-row mb-8"><label>Display Name *</label><input type="text" id="um-name" placeholder="e.g. Iago Uccio"></div>
+<div class="form-row mb-8"><label>PM Identifier <span style="font-weight:normal;color:var(--gr)">(matches p.pm — leave empty for read-only L1)</span></label><input type="text" id="um-pm" placeholder="e.g. Iago"></div>
+<div class="form-row mb-8"><label>Level *</label><select id="um-level"><option value="L1">L1 — Regular PM (scoped to own projects)</option><option value="L2">L2 — Admin (full access)</option></select></div>
+<div class="form-row mb-8"><label>Password</label><input type="password" id="um-pwd" placeholder="min 4 chars"></div>
+<div id="um-err" style="color:#B91C1C;font-size:11px;margin-top:6px;"></div>
+</div>
+<div class="sm-modal-ft"><button class="btn btn-d btn-sm" id="um-del-btn" onclick="deleteUser()" style="display:none">Delete</button><button class="btn btn-g btn-sm" onclick="closeUserModal()">Cancel</button><button class="btn btn-p btn-sm" onclick="saveUser()">Save</button></div></div></div>
+
 <div id="team-modal" class="sm-modal-bg hidden">
 <div class="sm-modal"><div class="sm-modal-hd" id="tm-modal-title">Add Team Member</div>
 <div class="sm-modal-body">
@@ -384,6 +395,7 @@ body.readonly .readonly-banner{display:block;}
 <button class="ntab" data-tab="team" onclick="showTab('team')">👥 Team</button>
 <button class="ntab" data-tab="tasks" onclick="showTab('tasks')">✅ Tasks</button>
 <button class="ntab" data-tab="reports" onclick="showTab('reports')">📈 Reports</button>
+<button class="ntab l2-only" data-tab="users" onclick="showTab('users')">👤 Users</button>
 </nav>
 <div class="bar-right">
 <button class="bar-ib" title="Search (Ctrl+K)" onclick="openPalette()">🔍</button>
@@ -480,6 +492,17 @@ body.readonly .readonly-banner{display:block;}
 <div id="reports-tab" class="tab">
 <div style="font-family:var(--fh);font-weight:800;font-size:20px;color:var(--or);margin-bottom:16px;">📈 Reports</div>
 <div class="reports-grid" id="reports-body"></div>
+</div>
+
+<!-- USERS (L2 only) -->
+<div id="users-tab" class="tab">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+<div style="font-family:var(--fh);font-weight:800;font-size:20px;color:var(--or);">👤 Users</div>
+<button class="btn btn-p btn-sm" onclick="openUserModal()">+ Add User</button>
+<button class="btn btn-g btn-sm" onclick="downloadData()" title="Export current state as data.json">📥 Download data.json</button>
+<span class="text-muted" style="font-size:11px;">Commit data.json to the repo to persist changes across devices.</span>
+</div>
+<div class="card" id="users-body"></div>
 </div>
 </div>
 
@@ -594,6 +617,7 @@ function showTab(id){
   if(id==='team')renderTeam();
   if(id==='tasks')renderTasks();
   if(id==='reports')renderReports();
+  if(id==='users')renderUsers();
 }
 
 // MULTI-SELECT
@@ -1246,6 +1270,65 @@ async function doLogin(){
 }
 function doLogout(){if(!confirm('Sign out?'))return;session=null;saveSession();location.reload();}
 
+// USER MANAGEMENT (L2 only)
+let userEditId=null;
+function renderUsers(){
+  const el=document.getElementById('users-body');if(!el)return;
+  if(!users.length){el.innerHTML='<div class="text-muted">No users yet.</div>';return;}
+  el.innerHTML='<div class="twrap"><table><thead><tr><th>Name</th><th>Level</th><th>PM Identifier</th><th></th></tr></thead><tbody>'+
+    users.map(u=>{
+      const isMe=session&&u.id===session.userId;
+      return'<tr><td><strong>'+u.name+'</strong>'+(isMe?' <span class="user-level">YOU</span>':'')+'</td>'+
+        '<td><span class="lvl-badge lvl-'+(u.level==='L2'?1:2)+'">'+u.level+'</span></td>'+
+        '<td>'+(u.pm?u.pm:'<span class="text-muted">— (read-only)</span>')+'</td>'+
+        '<td><button class="btn btn-g btn-xs" onclick="openUserModal(\''+u.id+'\')">Edit</button></td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+function openUserModal(id){
+  userEditId=id||null;
+  const u=id?users.find(x=>x.id===id):null;
+  document.getElementById('um-title').textContent=id?'Edit User':'Add User';
+  document.getElementById('um-name').value=u?.name||'';
+  document.getElementById('um-pm').value=u?.pm||'';
+  document.getElementById('um-level').value=u?.level||'L1';
+  document.getElementById('um-pwd').value='';
+  document.getElementById('um-pwd').placeholder=u?'(leave empty to keep current)':'min 4 chars';
+  document.getElementById('um-err').textContent='';
+  const canDelete=id&&session&&id!==session.userId;
+  document.getElementById('um-del-btn').style.display=canDelete?'':'none';
+  document.getElementById('user-modal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('um-name').focus(),60);
+}
+function closeUserModal(){document.getElementById('user-modal').classList.add('hidden');userEditId=null;}
+async function saveUser(){
+  const name=document.getElementById('um-name').value.trim();
+  const pm=document.getElementById('um-pm').value.trim();
+  const level=document.getElementById('um-level').value;
+  const pwd=document.getElementById('um-pwd').value;
+  const err=document.getElementById('um-err');err.textContent='';
+  if(!name){err.textContent='Name required';return;}
+  if(level!=='L1'&&level!=='L2'){err.textContent='Invalid level';return;}
+  if(!userEditId&&pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
+  if(pwd&&pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
+  if(userEditId){
+    const u=users.find(x=>x.id===userEditId);
+    if(!u){err.textContent='User not found';return;}
+    u.name=name;u.pm=pm;u.level=level;
+    if(pwd)u.passwordHash=await sha256(pwd);
+    if(session&&u.id===session.userId){session.name=name;session.level=level;session.pm=pm;saveSession();applySessionUI();}
+  }else{
+    users.push({id:uid(),name,level,pm,passwordHash:await sha256(pwd)});
+  }
+  saveU();closeUserModal();renderUsers();toast('User saved — download data.json to persist','success');
+}
+function deleteUser(){
+  if(!userEditId)return;
+  if(session&&userEditId===session.userId){toast('Cannot delete yourself','error');return;}
+  if(!confirm('Delete this user? They will no longer be able to log in.'))return;
+  users=users.filter(x=>x.id!==userEditId);
+  saveU();closeUserModal();renderUsers();toast('User deleted — download data.json to persist','success');
+}
+
 // COMMAND PALETTE
 let palIdx=0;
 function openPalette(){document.getElementById('palette-bg').classList.remove('hidden');document.getElementById('pal-input').value='';renderPalette();setTimeout(()=>document.getElementById('pal-input').focus(),50);}
@@ -1275,10 +1358,10 @@ document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return;
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openPalette();return;}
   if(e.key==='?'){showShortcuts();return;}
-  if(e.key==='Escape'){['palette-bg','proj-modal','team-modal','shortcuts-modal'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));return;}
+  if(e.key==='Escape'){['palette-bg','proj-modal','team-modal','shortcuts-modal','user-modal'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));return;}
   if(e.key==='n'||e.key==='N'){if(document.querySelector('.tab.on')?.id==='projects-tab')openNewModal();}
 });
-['palette-bg','proj-modal','team-modal','shortcuts-modal'].forEach(id=>{document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add('hidden');});});
+['palette-bg','proj-modal','team-modal','shortcuts-modal','user-modal'].forEach(id=>{document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add('hidden');});});
 document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap'))closeAllMS();});
 
 // INIT
