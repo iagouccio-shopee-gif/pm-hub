@@ -324,7 +324,8 @@ body.readonly .readonly-banner{display:block;}
 <div class="login-hd">🛒 Shopee PM Hub</div>
 <div class="login-sub">Sign in to continue</div>
 <div class="form-row"><label>User</label><select id="login-user" onchange="onLoginUserChange()"></select></div>
-<div class="form-row" id="login-pwd-row"><label>Password</label><input type="password" id="login-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<div class="form-row" id="login-pwd-row"><label id="login-pwd-label">Password</label><input type="password" id="login-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<div class="form-row" id="login-pwd2-row" style="display:none;"><label>Confirm Password</label><input type="password" id="login-pwd2" placeholder="Repeat password" onkeydown="if(event.key==='Enter')doLogin()"></div>
 <div class="login-hint" id="login-hint"></div>
 <div class="login-err" id="login-err"></div>
 <button class="btn btn-p login-btn" id="login-btn" onclick="doLogin()">Sign in</button>
@@ -524,7 +525,8 @@ body.readonly .readonly-banner{display:block;}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
 <div style="font-family:var(--fh);font-weight:800;font-size:20px;color:var(--or);">👤 Users</div>
 <button class="btn btn-p btn-sm" onclick="openUserModal()">+ Add User</button>
-<span class="text-muted" style="font-size:11px;">Changes auto-sync to data.json via GitHub. Sync indicator in the header (🟢 synced / 🟡 saving / 🔴 error).</span>
+<button class="btn btn-g btn-sm" onclick="resetUsersFromTeam()" title="Clear all users and re-seed from team[]">🔄 Reset from team</button>
+<span class="text-muted" style="font-size:11px;">Auto-seeded from team. Reset re-creates the list (Top-level → L2 admin, others → L1).</span>
 </div>
 <div class="card" id="users-body"></div>
 </div>
@@ -1332,15 +1334,29 @@ function onLoginUserChange(){
   const userId=document.getElementById('login-user')?.value;
   const u=userId?users.find(x=>x.id===userId):null;
   const pwdRow=document.getElementById('login-pwd-row');
+  const pwd2Row=document.getElementById('login-pwd2-row');
+  const pwdLabel=document.getElementById('login-pwd-label');
   const hint=document.getElementById('login-hint');
   const btn=document.getElementById('login-btn');
   if(!u||!pwdRow||!hint||!btn)return;
+  document.getElementById('login-pwd').value='';
+  document.getElementById('login-pwd2').value='';
   if(u.level==='L1'){
     pwdRow.style.display='none';
+    pwd2Row.style.display='none';
     hint.textContent='Direct access — no password required for L1';
     btn.textContent='Enter as '+u.name;
+  }else if(u.level==='L2'&&!u.passwordHash){
+    pwdRow.style.display='';
+    pwd2Row.style.display='';
+    pwdLabel.textContent='Set password';
+    hint.textContent='First sign-in as admin — choose a password (min 4 chars)';
+    btn.textContent='Set password & sign in';
+    setTimeout(()=>document.getElementById('login-pwd')?.focus(),40);
   }else{
     pwdRow.style.display='';
+    pwd2Row.style.display='none';
+    pwdLabel.textContent='Password';
     hint.textContent='';
     btn.textContent='Sign in';
     setTimeout(()=>document.getElementById('login-pwd')?.focus(),40);
@@ -1388,7 +1404,15 @@ async function doLogin(){
   const userId=document.getElementById('login-user').value;
   const u=users.find(x=>x.id===userId);
   if(!u){errEl.textContent='User not found.';return;}
-  if(u.level==='L2'){
+  if(u.level==='L2'&&!u.passwordHash){
+    // First-time admin sign-in — set password
+    const pwd=document.getElementById('login-pwd').value;
+    const pwd2=document.getElementById('login-pwd2').value;
+    if(pwd.length<4){errEl.textContent='Password must be at least 4 characters';return;}
+    if(pwd!==pwd2){errEl.textContent='Passwords do not match';return;}
+    u.passwordHash=await sha256(pwd);
+    saveU();
+  }else if(u.level==='L2'){
     const pwd=document.getElementById('login-pwd').value;
     const h=await sha256(pwd);
     if(h!==u.passwordHash){errEl.textContent='Incorrect password.';document.getElementById('login-pwd').select();return;}
@@ -1396,6 +1420,7 @@ async function doLogin(){
   session={userId:u.id,name:u.name,level:u.level,pm:u.pm||''};
   saveSession();
   document.getElementById('login-pwd').value='';
+  document.getElementById('login-pwd2').value='';
   applySessionUI();
   buildFilters();renderDashboard();rebuildPMSelects();
   document.getElementById('nc-projects').textContent=vp().length;
@@ -1520,6 +1545,29 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap'))closeAllMS();});
 
 // INIT
+function autoSeedUsers(){
+  if(!team||!team.length)return false;
+  const internal=team.filter(m=>m.type==='internal');
+  if(!internal.length)return false;
+  const adminTeam=internal.find(m=>(m.level||2)===1)||internal[0];
+  const hasL2=users.some(u=>u.level==='L2');
+  let added=false;
+  internal.forEach(m=>{
+    if(users.find(u=>u.name===m.name))return;
+    const isAdmin=m.id===adminTeam.id;
+    users.push({id:uid(),name:m.name,pm:m.name,level:(isAdmin&&!hasL2)?'L2':'L1',passwordHash:''});
+    added=true;
+  });
+  if(added){localStorage.setItem(STORE_USERS,JSON.stringify(users));scheduleSync();}
+  return added;
+}
+function resetUsersFromTeam(){
+  if(!confirm('Reset the user list from team data? This will REMOVE all existing user records (including custom passwords) and re-seed from team[]. The L1-level team member with reportTo="" becomes L2 admin with empty password (set on first login).'))return;
+  users=[];localStorage.setItem(STORE_USERS,JSON.stringify(users));
+  autoSeedUsers();
+  if(session&&!users.find(u=>u.id===session.userId)){session=null;saveSession();location.reload();return;}
+  renderUsers();toast('User list reset from team. Reload to log in.','success');
+}
 async function init(){
   const remote=await ghLoad();
   if(remote&&remote.users&&remote.users.length){
@@ -1535,6 +1583,8 @@ async function init(){
     // remote loaded but empty; local has data from pre-sync era — migrate up
     scheduleSync();
   }
+  // Auto-seed user list from team[] when empty (first run, or after a Reset)
+  if(!users.length)autoSeedUsers();
   applySessionUI();populateLoginUsers();
   if(!session)return;
   buildFilters();renderDashboard();rebuildPMSelects();
