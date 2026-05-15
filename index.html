@@ -226,6 +226,9 @@ body:not(.no-users) .bootstrap-view{display:none;}
 .bs-step.hidden{display:none;}
 .bs-tip{font-size:11px;background:#FFF3F0;padding:9px 11px;border-radius:6px;color:var(--bk);margin:10px 0 14px;line-height:1.5;}
 .bs-tip code{background:rgba(238,77,45,.15);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px;}
+body.readonly .rw-only{display:none!important;}
+.readonly-banner{display:none;background:#FFFBEA;border:1px solid #FBBF24;border-radius:var(--r);padding:8px 14px;margin-bottom:12px;font-size:12px;color:#92400E;font-weight:600;}
+body.readonly .readonly-banner{display:block;}
 .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px;}
 .prod-card{background:#FAFAFA;border-radius:var(--rs);padding:12px 14px;border-left:3px solid var(--or);transition:var(--tr);}
 .prod-card:hover{box-shadow:var(--sh);}
@@ -392,6 +395,7 @@ body:not(.no-users) .bootstrap-view{display:none;}
 <!-- DASHBOARD -->
 <div id="dashboard-tab" class="tab on">
 <div class="l2-only l2-banner">🔓 L2 — Full Access. Productivity dashboard visible below.</div>
+<div class="readonly-banner">👁 Read-only — your account has no PM identifier assigned. Ask an L2 to set yours to enable edits.</div>
 <div class="stats-grid" id="dash-stats"></div>
 <div class="stats-grid stats-grid-sm" id="dash-ongoing"></div>
 <div class="dash-grid">
@@ -422,7 +426,7 @@ body:not(.no-users) .bootstrap-view{display:none;}
 </div>
 <div class="fbar" id="proj-fbar" style="margin-bottom:0;flex:1;"></div>
 <span id="proj-info" class="text-muted"></span>
-<button class="btn btn-p btn-sm" onclick="openNewModal()">+ Add Project</button>
+<button class="btn btn-p btn-sm rw-only" onclick="openNewModal()">+ Add Project</button>
 </div>
 <div id="view-table"><div id="proj-table-wrap"></div></div>
 <div id="view-board" class="hidden"><div class="board-wrap" id="proj-board"></div></div>
@@ -451,7 +455,7 @@ body:not(.no-users) .bootstrap-view{display:none;}
 <!-- TEAM -->
 <div id="team-tab" class="tab">
 <div class="flex-between mb-12"><div style="font-family:var(--fh);font-weight:800;font-size:20px;color:var(--or);">👥 Team</div>
-<button class="btn btn-p btn-sm" onclick="openTeamModal()">+ Add Member</button></div>
+<button class="btn btn-p btn-sm l2-only" onclick="openTeamModal()">+ Add Member</button></div>
 <div class="team-grid" id="team-grid"></div>
 <div class="org-section" id="org-section"><div class="ctitle" style="margin-top:20px">🏢 Org Chart</div><div class="org-chart" id="org-chart"></div></div>
 </div>
@@ -532,7 +536,7 @@ body:not(.no-users) .bootstrap-view{display:none;}
 </div>
 <div class="modal-ft">
 <button class="btn btn-g btn-sm" onclick="closeModal()">Cancel</button>
-<button class="btn btn-p btn-sm" onclick="saveModal()">💾 Save Project</button>
+<button class="btn btn-p btn-sm" id="m-save-btn" onclick="saveModal()">💾 Save Project</button>
 </div></div></div>
 
 <div id="toast-ct"></div>
@@ -554,6 +558,10 @@ function saveU(){localStorage.setItem(STORE_USERS,JSON.stringify(users));}
 function loadSession(){try{return JSON.parse(localStorage.getItem(STORE_SESSION))||null;}catch(e){return null;}}
 function saveSession(){if(session)localStorage.setItem(STORE_SESSION,JSON.stringify(session));else localStorage.removeItem(STORE_SESSION);}
 async function sha256(s){const buf=new TextEncoder().encode(s);const h=await crypto.subtle.digest('SHA-256',buf);return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+// L1/L2 SCOPE — vp() returns visible projects, canEdit(p) returns write permission, isReadOnly() flags L1 with no pm
+function vp(){if(!session)return[];if(session.level==='L2')return projects;if(!session.pm)return projects;return projects.filter(p=>p.pm===session.pm);}
+function canEdit(p){if(!session)return false;if(session.level==='L2')return true;if(!session.pm)return false;return!p||p.pm===session.pm;}
+function isReadOnly(){return!!session&&session.level==='L1'&&!session.pm;}
 let projects=loadP(),team=loadT(),tasks=loadTasks(),users=loadU(),session=loadSession();
 let editId=null,teamEditId=null,sortCol='priority',sortDir=1,curView='table',rmGroup='pm';
 let MS={},customFilter=null,taskView='list';
@@ -603,10 +611,10 @@ function getMS(id){return[...(MS[id]||new Set())];}
 function filterMSOpts(id,q){document.querySelectorAll('#msl-'+id+' .ms-opt').forEach(o=>{o.style.display=o.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
 
 function getFiltered(){
-  if(customFilter)return projects.filter(customFilter);
+  if(customFilter)return vp().filter(customFilter);
   const q=(document.getElementById('proj-search')?.value||'').toLowerCase();
   const sts=getMS('status'),pris=getMS('priority'),pms=getMS('pm'),lns=getMS('line');
-  return projects.filter(p=>{
+  return vp().filter(p=>{
     if(q&&!((p.initiative||'').toLowerCase().includes(q)||(p.description||'').toLowerCase().includes(q)||(p.pm||'').toLowerCase().includes(q)||(p.productLine||'').toLowerCase().includes(q)))return false;
     if(sts.length&&!sts.includes(p.status))return false;
     if(pris.length&&!pris.includes(p.priority))return false;
@@ -627,9 +635,10 @@ function getFiltered(){
 }
 
 function buildFilters(){
-  const pms=[...new Set(projects.map(p=>p.pm).filter(Boolean))].sort();
-  const lines=[...new Set(projects.map(p=>p.productLine).filter(Boolean))].sort();
-  const statuses=[...new Set(projects.map(p=>p.status).filter(Boolean))].sort();
+  const scope=vp();
+  const pms=[...new Set(scope.map(p=>p.pm).filter(Boolean))].sort();
+  const lines=[...new Set(scope.map(p=>p.productLine).filter(Boolean))].sort();
+  const statuses=[...new Set(scope.map(p=>p.status).filter(Boolean))].sort();
   const fb=document.getElementById('proj-fbar');if(!fb)return;
   fb.innerHTML='<div class="fg"><label>Search</label><input class="search-inp" id="proj-search" placeholder="Search projects..." oninput="renderProjects()"></div>'+
   '<div class="fg"><label>Status</label>'+buildMS('status','Status',statuses)+'</div>'+
@@ -644,8 +653,8 @@ function setView(v){curView=v;['table','board','roadmap'].forEach(x=>{document.g
 
 function renderProjects(){
   const filtered=getFiltered();
-  const info=document.getElementById('proj-info');if(info)info.textContent=filtered.length+' of '+projects.length;
-  const nc=document.getElementById('nc-projects');if(nc)nc.textContent=projects.length;
+  const info=document.getElementById('proj-info');if(info)info.textContent=filtered.length+' of '+vp().length;
+  const nc=document.getElementById('nc-projects');if(nc)nc.textContent=vp().length;
   if(curView==='table')renderTable(filtered);
   else if(curView==='board')renderBoard(filtered);
   else renderRoadmap(filtered);
@@ -705,7 +714,7 @@ function toggleRow(id){
   document.querySelectorAll('[id^="exp-"]').forEach(r=>{r.style.display='none';});
   document.querySelectorAll('tbody tr').forEach(r=>r.classList.remove('expanded'));
   if(!isOpen){
-    const p=projects.find(x=>x.id===id);
+    const p=vp().find(x=>x.id===id);
     if(!p)return;
     exp.style.display='';tr.classList.add('expanded');
     document.getElementById('exp-body-'+id).innerHTML=buildExpand(p);
@@ -744,7 +753,7 @@ function buildExpand(p){
     '</div></div>';
 }
 
-function toggleStar(id){const p=projects.find(x=>x.id===id);if(p){p.starred=!p.starred;saveP();renderProjects();}}
+function toggleStar(id){const p=projects.find(x=>x.id===id);if(!p)return;if(!canEdit(p)){toast('Read-only — cannot star','warn');return;}p.starred=!p.starred;saveP();renderProjects();}
 
 // BOARD VIEW with drag & drop
 function renderBoard(filtered){
@@ -776,7 +785,9 @@ function boardDrop(e,stage){
   e.preventDefault();e.currentTarget.classList.remove('drag-over');
   const id=e.dataTransfer.getData('text/plain');
   const p=projects.find(x=>x.id===id);
-  if(p&&p.status!==stage){
+  if(!p)return;
+  if(!canEdit(p)){toast('Read-only — cannot move','warn');return;}
+  if(p.status!==stage){
     p.status=stage;saveP();renderProjects();toast('Moved to '+stage,'success');
   }
 }
@@ -817,25 +828,26 @@ function renderRoadmap(filtered){
 // DASHBOARD
 function renderDashboard(){
   const el=document.getElementById('dash-stats');if(!el)return;
+  const scope=vp();
   const today=new Date();today.setHours(0,0,0,0);
   const in30=new Date(today.getTime()+30*86400000);
   const ONGOING_ST=['Discovery','FRF','BRD','PRD','Dev','UAT','Live Testing','AB Testing'];
-  const liveCount=projects.filter(p=>p.status==='Live').length;
-  const ongoingCount=projects.filter(p=>ONGOING_ST.includes(p.status)).length;
-  const eta30L=projects.filter(p=>{if(!p.localETA||p.localETA==='NA')return false;const d=new Date(p.localETA+'T00:00:00');return!isNaN(d)&&d>=today&&d<=in30;}).length;
-  const eta30R=projects.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;const d=new Date(p.liveETA+'T00:00:00');return!isNaN(d)&&d>=today&&d<=in30;}).length;
+  const liveCount=scope.filter(p=>p.status==='Live').length;
+  const ongoingCount=scope.filter(p=>ONGOING_ST.includes(p.status)).length;
+  const eta30L=scope.filter(p=>{if(!p.localETA||p.localETA==='NA')return false;const d=new Date(p.localETA+'T00:00:00');return!isNaN(d)&&d>=today&&d<=in30;}).length;
+  const eta30R=scope.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;const d=new Date(p.liveETA+'T00:00:00');return!isNaN(d)&&d>=today&&d<=in30;}).length;
   el.innerHTML=
-    '<div class="stat-card anim-in d1 clickable" onclick="clearAllFilters();showTab(\'projects\')"><div class="stat-num">'+projects.length+'</div><div class="stat-lbl">Total</div></div>'+
+    '<div class="stat-card anim-in d1 clickable" onclick="clearAllFilters();showTab(\'projects\')"><div class="stat-num">'+scope.length+'</div><div class="stat-lbl">Total</div></div>'+
     '<div class="stat-card anim-in d2 clickable" onclick="filterByStatus(\'Live\')"><div class="stat-num" style="color:#15803D">'+liveCount+'</div><div class="stat-lbl">Live</div></div>'+
     '<div class="stat-card anim-in d3" style="cursor:default"><div class="stat-num">'+ongoingCount+'</div><div class="stat-lbl">Ongoing</div></div>'+
     '<div class="stat-card anim-in d4 clickable" onclick="filterETA30(\'local\')"><div class="stat-num" style="color:#B45309">'+eta30L+'</div><div class="stat-lbl">ETA 30D Local</div></div>'+
     '<div class="stat-card anim-in d5 clickable" onclick="filterETA30(\'live\')"><div class="stat-num" style="color:#6D28D9">'+eta30R+'</div><div class="stat-lbl">ETA 30D Regional</div></div>';
   const ongoingEl=document.getElementById('dash-ongoing');
-  if(ongoingEl)ongoingEl.innerHTML=ONGOING_ST.map((s,i)=>{const n=projects.filter(p=>p.status===s).length;return'<div class="stat-card stat-card-sm anim-in d'+(i%6+1)+' clickable" onclick="filterByStatus(\''+s+'\')"><div class="stat-num stat-num-sm">'+n+'</div><div class="stat-lbl">'+s+'</div></div>';}).join('');
-  const chartProj=projects.filter(p=>!FROZEN.includes(p.status)&&p.status!=='Live'&&p.status!=='Backlog');
+  if(ongoingEl)ongoingEl.innerHTML=ONGOING_ST.map((s,i)=>{const n=scope.filter(p=>p.status===s).length;return'<div class="stat-card stat-card-sm anim-in d'+(i%6+1)+' clickable" onclick="filterByStatus(\''+s+'\')"><div class="stat-num stat-num-sm">'+n+'</div><div class="stat-lbl">'+s+'</div></div>';}).join('');
+  const chartProj=scope.filter(p=>!FROZEN.includes(p.status)&&p.status!=='Live'&&p.status!=='Backlog');
   const STATUS_ORDER=['Discovery','FRF','BRD','PRD','Dev','UAT','Live Testing','AB Testing','Live','Backlog',...FROZEN];
-  const maxSt=Math.max(...STATUS_ORDER.map(s=>projects.filter(p=>p.status===s).length),1);
-  document.getElementById('dash-by-status').innerHTML='<div class="ctitle">📊 By Status</div>'+STATUS_ORDER.map(s=>{const n=projects.filter(p=>p.status===s).length;if(!n&&FROZEN.includes(s))return'';return'<div class="chart-row" onclick="filterByStatus(\''+s+'\')" title="Filter '+s+'"><span class="chart-lbl"><span class="badge '+sCls(s)+'" style="font-size:10px">'+s+'</span></span><div style="flex:1"><div class="chart-bar" style="width:'+Math.round(n/maxSt*100)+'%"></div></div><span class="chart-val">'+n+'</span></div>';}).join('');
+  const maxSt=Math.max(...STATUS_ORDER.map(s=>scope.filter(p=>p.status===s).length),1);
+  document.getElementById('dash-by-status').innerHTML='<div class="ctitle">📊 By Status</div>'+STATUS_ORDER.map(s=>{const n=scope.filter(p=>p.status===s).length;if(!n&&FROZEN.includes(s))return'';return'<div class="chart-row" onclick="filterByStatus(\''+s+'\')" title="Filter '+s+'"><span class="chart-lbl"><span class="badge '+sCls(s)+'" style="font-size:10px">'+s+'</span></span><div style="flex:1"><div class="chart-bar" style="width:'+Math.round(n/maxSt*100)+'%"></div></div><span class="chart-val">'+n+'</span></div>';}).join('');
   const pbs=['P0','P1','P2','P3','To define'];const maxPr=Math.max(...pbs.map(p=>chartProj.filter(x=>x.priority===p).length),1);
   document.getElementById('dash-by-priority').innerHTML='<div class="ctitle">🎯 By Priority</div>'+pbs.map(p=>{const n=chartProj.filter(x=>x.priority===p).length;return'<div class="chart-row" onclick="filterByPriority(\''+p+'\')" title="Filter '+p+'"><span class="chart-lbl"><span class="badge '+pCls(p)+'" style="font-size:10px">'+p+'</span></span><div style="flex:1"><div class="chart-bar" style="width:'+Math.round(n/maxPr*100)+'%"></div></div><span class="chart-val">'+n+'</span></div>';}).join('');
   const pmMap={};chartProj.forEach(p=>{if(p.pm){pmMap[p.pm]=(pmMap[p.pm]||0)+1;}});
@@ -855,12 +867,13 @@ function filterETA30(type){const t=new Date();t.setHours(0,0,0,0);const t30=new 
 // HEATMAP
 function renderHeatmap(){
   const el=document.getElementById('hm-body');if(!el)return;
-  const pms=[...new Set(projects.map(p=>p.pm).filter(Boolean))].sort();
+  const scope=vp();
+  const pms=[...new Set(scope.map(p=>p.pm).filter(Boolean))].sort();
   const today=new Date();const months=[];
   for(let i=-1;i<=13;i++){const d=new Date(today.getFullYear(),today.getMonth()+i,1);months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
   const curMK=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
   const matrix={};
-  projects.forEach(p=>{
+  scope.forEach(p=>{
     if(!p.pm)return;
     let sD=null,eD=null;
     if(p.localETA&&p.localETA!=='NA'){const d=new Date(p.localETA+'T00:00:00');if(!isNaN(d))sD=d;}
@@ -902,11 +915,12 @@ function renderAdminDash(){
 // CHANGELOG
 function renderChangelog(){
   const el=document.getElementById('cl-feed');if(!el)return;
+  const scope=vp();
   const pmSel=document.getElementById('cl-pm-filter');
-  if(pmSel&&pmSel.options.length<=1){const pms=[...new Set(projects.map(p=>p.pm).filter(Boolean))].sort();pmSel.innerHTML='<option value="">All PMs</option>'+pms.map(pm=>'<option>'+pm+'</option>').join('');}
+  if(pmSel&&pmSel.options.length<=1){const pms=[...new Set(scope.map(p=>p.pm).filter(Boolean))].sort();pmSel.innerHTML='<option value="">All PMs</option>'+pms.map(pm=>'<option>'+pm+'</option>').join('');}
   const filterPm=pmSel?.value||'';
   const entries=[];
-  projects.forEach(p=>{
+  scope.forEach(p=>{
     if(filterPm&&p.pm!==filterPm)return;
     (p.weeklyUpdates||[]).forEach(u=>{
       const ud=typeof u==='object'?u.date||'':'';
@@ -921,7 +935,7 @@ function renderChangelog(){
 
 function generateReleaseNotes(){
   const entries=[];
-  projects.forEach(p=>{(p.weeklyUpdates||[]).forEach(u=>{const ud=typeof u==='object'?u.date||'':'';const ut=typeof u==='object'?(u.content||u.text||''):String(u);if(ut)entries.push({date:ud,project:p.initiative,pm:p.pm,text:ut});});});
+  vp().forEach(p=>{(p.weeklyUpdates||[]).forEach(u=>{const ud=typeof u==='object'?u.date||'':'';const ut=typeof u==='object'?(u.content||u.text||''):String(u);if(ut)entries.push({date:ud,project:p.initiative,pm:p.pm,text:ut});});});
   entries.sort((a,b)=>b.date.localeCompare(a.date));
   if(!entries.length){toast('No updates to generate from','warn');return;}
   const byWk={};entries.slice(0,30).forEach(e=>{const w=e.date.slice(0,7)||'Unknown';if(!byWk[w])byWk[w]=[];byWk[w].push(e);});
@@ -936,8 +950,9 @@ function generateReleaseNotes(){
 function renderTeam(){
   const el=document.getElementById('team-grid');if(!el)return;
   if(!team.length){el.innerHTML='<div style="grid-column:1/-1">'+emptyState('👥','No team members','Add your PMs and stakeholders.','openTeamModal()','Add Member')+'</div>';return;}
+  const scope=vp();
   el.innerHTML=team.map((m,i)=>{
-    const c=projects.filter(p=>p.pm===m.name).length;const lv=m.level||2;
+    const c=scope.filter(p=>p.pm===m.name).length;const lv=m.level||2;
     const av=m.photoUrl
       ?'<img src="'+m.photoUrl+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid var(--or)" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"><div class="t-avatar" style="display:none">'+initials(m.name)+'</div>'
       :'<div class="t-avatar">'+initials(m.name)+'</div>';
@@ -954,7 +969,8 @@ function renderOrgChart(){
   const l1=team.filter(m=>(m.level||2)===1);
   const l2=team.filter(m=>(m.level||2)===2);
   const l3=team.filter(m=>(m.level||2)===3);
-  function node(m){const c=projects.filter(p=>p.pm===m.name).length;return'<div class="org-node '+(m.level===1?'lvl1-node':'')+'"><div class="org-node-avatar">'+initials(m.name)+'</div><div class="org-node-name">'+m.name+'</div><div class="org-node-sub">'+(m.type||'PM')+' · '+c+'p</div></div>';}
+  const scope=vp();
+  function node(m){const c=scope.filter(p=>p.pm===m.name).length;return'<div class="org-node '+(m.level===1?'lvl1-node':'')+'"><div class="org-node-avatar">'+initials(m.name)+'</div><div class="org-node-name">'+m.name+'</div><div class="org-node-sub">'+(m.type||'PM')+' · '+c+'p</div></div>';}
   let html='';
   if(l1.length){html+='<div class="org-lvl-lbl">Leadership (L1)</div><div class="org-top">'+l1.map(node).join('')+'</div>';}
   if(l2.length){html+='<div style="text-align:center;color:#D1D5DB;font-size:20px;padding:8px 0">↓</div><div class="org-lvl-lbl">Team (L2)</div><div class="org-children">'+l2.map(node).join('')+'</div>';}
@@ -975,7 +991,7 @@ function renderTasks(){
   if(oSel){const pms=[...new Set(team.map(m=>m.name))].sort();oSel.innerHTML='<option value="">— Unassigned —</option>'+pms.map(pm=>'<option value="'+pm+'">'+pm+'</option>').join('')+'<option value="__others__">Others...</option>';}
   // Populate project datalist
   const pDL=document.getElementById('task-proj-list');
-  if(pDL){pDL.innerHTML=projects.slice().sort((a,b)=>(a.initiative||'').localeCompare(b.initiative||'')).map(p=>'<option value="'+(p.initiative||'Unnamed').replace(/"/g,'&quot;')+'">').join('');}
+  if(pDL){pDL.innerHTML=vp().slice().sort((a,b)=>(a.initiative||'').localeCompare(b.initiative||'')).map(p=>'<option value="'+(p.initiative||'Unnamed').replace(/"/g,'&quot;')+'">').join('');}
   if(taskView==='kanban'){renderTaskKanban();return;}
   const pEl=document.getElementById('tasks-pending');const dEl=document.getElementById('tasks-done');
   if(!pEl||!dEl)return;
@@ -1014,11 +1030,12 @@ function deleteTask(id){tasks=tasks.filter(x=>x.id!==id);saveTasks();renderTasks
 // REPORTS (High / Medium / Low + by PM + by Line)
 function renderReports(){
   const el=document.getElementById('reports-body');if(!el)return;
+  const scope=vp();
   const today=new Date();
-  const high=projects.filter(p=>p.priority==='P0');
-  const med=projects.filter(p=>p.priority==='P1'||p.priority==='P2');
-  const low=projects.filter(p=>p.priority==='P3'||p.priority==='To define');
-  const overdue=projects.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;return new Date(p.liveETA+'T00:00:00')<today&&p.status!=='Live';}).sort((a,b)=>pOrd(a.priority)-pOrd(b.priority));
+  const high=scope.filter(p=>p.priority==='P0');
+  const med=scope.filter(p=>p.priority==='P1'||p.priority==='P2');
+  const low=scope.filter(p=>p.priority==='P3'||p.priority==='To define');
+  const overdue=scope.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;return new Date(p.liveETA+'T00:00:00')<today&&p.status!=='Live';}).sort((a,b)=>pOrd(a.priority)-pOrd(b.priority));
   function prioSection(label,ps,col){
     if(!ps.length)return'<div class="text-muted">No '+label+' projects.</div>';
     return'<div class="twrap"><table><thead><tr><th>Initiative</th><th>Priority</th><th>Status</th><th>PM</th><th>Live ETA</th><th></th></tr></thead><tbody>'+ps.slice(0,20).map(p=>'<tr><td class="tr-name">'+((p.initiative||'—').replace(/</g,'&lt;'))+'</td><td><span class="badge '+pCls(p.priority)+'">'+p.priority+'</span></td><td><span class="badge '+sCls(p.status)+'">'+p.status+'</span></td><td>'+(p.pm||'—')+'</td><td>'+fmtD(p.liveETA)+'</td><td><button class="btn btn-g btn-xs" onclick="openModal(\''+p.id+'\')">Edit</button></td></tr>').join('')+'</tbody></table></div>'+(ps.length>20?'<div class="text-muted mt-8">+ '+(ps.length-20)+' more</div>':'');
@@ -1032,9 +1049,11 @@ function renderReports(){
 
 // PROJECT MODAL
 function openNewModal(){
+  if(isReadOnly()){toast('Read-only — cannot create projects','warn');return;}
   editId=null;
   document.getElementById('modal-title').textContent='New Project';
   document.getElementById('modal-del-btn').style.display='none';
+  document.getElementById('m-save-btn').style.display='';
   ['m-initiative','m-line','m-obj','m-bizpic','m-devpic','m-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('m-priority').value='P2';
   document.getElementById('m-status').value='Backlog';
@@ -1043,7 +1062,7 @@ function openNewModal(){
   document.getElementById('rte-upd').innerHTML='';
   document.getElementById('updates-list').innerHTML='';
   document.getElementById('reminders-list').innerHTML='';
-  rebuildPMSelects(null);
+  rebuildPMSelects(session&&session.level==='L1'?session.pm:null);
   document.getElementById('proj-modal').classList.remove('hidden');
   setTimeout(()=>document.getElementById('m-initiative').focus(),100);
 }
@@ -1051,8 +1070,10 @@ function openModal(id){
   const p=projects.find(x=>x.id===id);
   if(!p){toast('Project not found','error');return;}
   editId=id;
+  const editable=canEdit(p);
   document.getElementById('modal-title').textContent=p.initiative||'Edit Project';
-  document.getElementById('modal-del-btn').style.display='';
+  document.getElementById('modal-del-btn').style.display=editable?'':'none';
+  document.getElementById('m-save-btn').style.display=editable?'':'none';
   document.getElementById('m-initiative').value=p.initiative||'';
   document.getElementById('m-priority').value=p.priority||'P2';
   document.getElementById('m-status').value=p.status||'Backlog';
@@ -1073,14 +1094,25 @@ function closeModal(){document.getElementById('proj-modal').classList.add('hidde
 function saveModal(){
   const init=document.getElementById('m-initiative').value.trim();
   if(!init){toast('Project name required','error');return;}
-  const data={initiative:init,priority:document.getElementById('m-priority').value,status:document.getElementById('m-status').value,productLine:document.getElementById('m-line').value.trim(),businessObjective:document.getElementById('m-obj').value.trim(),pm:document.getElementById('m-pm').value,businessLocalPic:document.getElementById('m-bizpic').value.trim(),devPic:document.getElementById('m-devpic').value.trim(),description:document.getElementById('m-desc').value.trim(),localETA:document.getElementById('m-localeta').value||'NA',liveETA:document.getElementById('m-liveeta').value||'NA'};
-  if(editId){const p=projects.find(x=>x.id===editId);if(p)Object.assign(p,data);}
+  const existing=editId?projects.find(x=>x.id===editId):null;
+  if(editId&&!canEdit(existing)){toast('No permission to edit this project','error');return;}
+  if(!editId&&isReadOnly()){toast('Read-only — cannot create','error');return;}
+  let pmVal=document.getElementById('m-pm').value;
+  if(session&&session.level==='L1'&&session.pm)pmVal=session.pm;
+  const data={initiative:init,priority:document.getElementById('m-priority').value,status:document.getElementById('m-status').value,productLine:document.getElementById('m-line').value.trim(),businessObjective:document.getElementById('m-obj').value.trim(),pm:pmVal,businessLocalPic:document.getElementById('m-bizpic').value.trim(),devPic:document.getElementById('m-devpic').value.trim(),description:document.getElementById('m-desc').value.trim(),localETA:document.getElementById('m-localeta').value||'NA',liveETA:document.getElementById('m-liveeta').value||'NA'};
+  if(editId){if(existing)Object.assign(existing,data);}
   else{projects.unshift(Object.assign({id:uid(),weeklyUpdates:[],reminders:[],starred:false,changelog:''},data));}
   saveP();closeModal();renderProjects();renderDashboard();toast('Project saved','success');
 }
-function deleteProject(){if(!editId||!confirm('Delete this project? Cannot undo.'))return;projects=projects.filter(x=>x.id!==editId);saveP();closeModal();renderProjects();renderDashboard();toast('Deleted');}
+function deleteProject(){if(!editId)return;const p=projects.find(x=>x.id===editId);if(!canEdit(p)){toast('No permission to delete this project','error');return;}if(!confirm('Delete this project? Cannot undo.'))return;projects=projects.filter(x=>x.id!==editId);saveP();closeModal();renderProjects();renderDashboard();toast('Deleted');}
 function rebuildPMSelects(current){
   const sel=document.getElementById('m-pm');if(!sel)return;
+  if(session&&session.level==='L1'&&session.pm){
+    sel.innerHTML='<option value="'+session.pm+'" selected>'+session.pm+'</option>';
+    sel.disabled=true;
+    return;
+  }
+  sel.disabled=false;
   const pms=[...new Set([...team.filter(m=>m.type==='internal').map(m=>m.name),...projects.map(p=>p.pm).filter(Boolean)])].sort();
   sel.innerHTML='<option value="">— Unassigned —</option>'+pms.map(p=>'<option value="'+p+'" '+(p===current?'selected':'')+'>'+p+'</option>').join('');
 }
@@ -1139,11 +1171,13 @@ function applySessionUI(){
   if(session){
     document.body.classList.remove('no-session');
     document.body.classList.toggle('l2-mode',session.level==='L2');
+    document.body.classList.toggle('l1-mode',session.level==='L1');
+    document.body.classList.toggle('readonly',isReadOnly());
     const w=document.getElementById('user-widget');
     if(w)w.innerHTML='<span class="user-name" title="'+session.name+'">'+session.name+'</span><span class="user-level">'+session.level+'</span><button class="bar-ib" title="Sign out" onclick="doLogout()">⏻</button>';
   }else{
     document.body.classList.add('no-session');
-    document.body.classList.remove('l2-mode');
+    document.body.classList.remove('l2-mode','l1-mode','readonly');
     const w=document.getElementById('user-widget');if(w)w.innerHTML='';
   }
 }
@@ -1190,7 +1224,7 @@ function finishBootstrap(){
   document.body.classList.remove('no-users');
   applySessionUI();
   buildFilters();renderDashboard();rebuildPMSelects();
-  document.getElementById('nc-projects').textContent=projects.length;
+  document.getElementById('nc-projects').textContent=vp().length;
   toast('Welcome, '+session.name,'success');
 }
 async function doLogin(){
@@ -1207,7 +1241,7 @@ async function doLogin(){
   document.getElementById('login-pwd').value='';
   applySessionUI();
   buildFilters();renderDashboard();rebuildPMSelects();
-  document.getElementById('nc-projects').textContent=projects.length;
+  document.getElementById('nc-projects').textContent=vp().length;
   toast('Welcome, '+u.name,'success');
 }
 function doLogout(){if(!confirm('Sign out?'))return;session=null;saveSession();location.reload();}
@@ -1219,9 +1253,10 @@ function closePalette(){document.getElementById('palette-bg').classList.add('hid
 function renderPalette(){
   const q=document.getElementById('pal-input').value.toLowerCase();
   const el=document.getElementById('pal-results');if(!el)return;
-  const nav=[{i:'📊',t:'Dashboard',s:'Overview & heatmap',a:"closePalette();showTab('dashboard')"},{i:'📁',t:'Projects',s:'All '+projects.length+' projects',a:"closePalette();showTab('projects')"},{i:'📋',t:'Changelog',s:'Activity feed',a:"closePalette();showTab('changelog')"},{i:'👥',t:'Team',s:'Manage team',a:"closePalette();showTab('team')"},{i:'✅',t:'Tasks',s:'My tasks',a:"closePalette();showTab('tasks')"},{i:'📈',t:'Reports',s:'Analytics',a:"closePalette();showTab('reports')"},{i:'➕',t:'New Project',s:'Add project',a:"closePalette();openNewModal()"}];
+  const scope=vp();
+  const nav=[{i:'📊',t:'Dashboard',s:'Overview & heatmap',a:"closePalette();showTab('dashboard')"},{i:'📁',t:'Projects',s:'All '+scope.length+' projects',a:"closePalette();showTab('projects')"},{i:'📋',t:'Changelog',s:'Activity feed',a:"closePalette();showTab('changelog')"},{i:'👥',t:'Team',s:'Manage team',a:"closePalette();showTab('team')"},{i:'✅',t:'Tasks',s:'My tasks',a:"closePalette();showTab('tasks')"},{i:'📈',t:'Reports',s:'Analytics',a:"closePalette();showTab('reports')"},{i:'➕',t:'New Project',s:'Add project',a:"closePalette();openNewModal()"}];
   const mn=q?nav.filter(x=>x.t.toLowerCase().includes(q)||x.s.toLowerCase().includes(q)):nav;
-  const mp=q?projects.filter(p=>(p.initiative||'').toLowerCase().includes(q)||(p.pm||'').toLowerCase().includes(q)).slice(0,8):projects.filter(p=>p.starred||p.priority==='P0').slice(0,6);
+  const mp=q?scope.filter(p=>(p.initiative||'').toLowerCase().includes(q)||(p.pm||'').toLowerCase().includes(q)).slice(0,8):scope.filter(p=>p.starred||p.priority==='P0').slice(0,6);
   palIdx=0;
   let html=mn.length?'<div class="pal-section-lbl">Navigation</div>'+mn.map((x,i)=>'<div class="pal-item '+(i===0&&!q?'active':'')+'" onclick="'+x.a+'"><span class="pal-item-icon">'+x.i+'</span><div class="pal-item-main"><div class="pal-item-title">'+x.t+'</div><div class="pal-item-sub">'+x.s+'</div></div></div>').join(''):'';
   if(mp.length)html+='<div class="pal-section-lbl">Projects</div>'+mp.map(p=>'<div class="pal-item" onclick="closePalette();openModal(\''+p.id+'\')"><span class="pal-item-icon">📁</span><div class="pal-item-main"><div class="pal-item-title">'+((p.initiative||'—').replace(/</g,'&lt;'))+'</div><div class="pal-item-sub">'+(p.pm||'—')+'</div></div><span class="badge '+pCls(p.priority)+'" style="font-size:10px">'+p.priority+'</span></div>').join('');
@@ -1251,7 +1286,7 @@ function init(){
   applySessionUI();populateLoginUsers();
   if(!session)return;
   buildFilters();renderDashboard();rebuildPMSelects();
-  document.getElementById('nc-projects').textContent=projects.length;
+  document.getElementById('nc-projects').textContent=vp().length;
 }
 document.addEventListener('DOMContentLoaded',init);
 
