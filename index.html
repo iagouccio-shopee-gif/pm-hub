@@ -842,8 +842,8 @@ function renderAdminDash(){
   const pmList=[...new Set(projects.filter(p=>!FROZEN.includes(p.status)&&p.status!=='Live').map(p=>p.pm).filter(Boolean))].sort();
   el.innerHTML='<div class="prod-grid">'+pmList.map(pm=>{
     const mp=projects.filter(p=>p.pm===pm&&!FROZEN.includes(p.status)&&p.status!=='Live');
-    const ov=mp.filter(p=>p.liveETA&&p.liveETA!=='NA'&&new Date(p.liveETA)<today).length;
-    const up30=mp.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;const d=new Date(p.liveETA);return d>=today&&d<=new Date(today.getTime()+30*86400000);}).length;
+    const ov=mp.filter(p=>p.liveETA&&p.liveETA!=='NA'&&new Date(p.liveETA+'T00:00:00')<today).length;
+    const up30=mp.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;const d=new Date(p.liveETA+'T00:00:00');return d>=today&&d<=new Date(today.getTime()+30*86400000);}).length;
     return'<div class="prod-card"><div class="prod-name">'+pm+'</div><div class="prod-stats"><div class="prod-stat"><strong>'+mp.length+'</strong>Active</div><div class="prod-stat '+(ov>0?'warn':'ok')+'"><strong>'+ov+'</strong>Overdue</div><div class="prod-stat"><strong>'+up30+'</strong>Due 30d</div></div></div>';
   }).join('')+'</div>';
 }
