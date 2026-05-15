@@ -967,7 +967,7 @@ function renderReports(){
   const high=projects.filter(p=>p.priority==='P0');
   const med=projects.filter(p=>p.priority==='P1'||p.priority==='P2');
   const low=projects.filter(p=>p.priority==='P3'||p.priority==='To define');
-  const overdue=projects.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;return new Date(p.liveETA)<today&&p.status!=='Live';}).sort((a,b)=>pOrd(a.priority)-pOrd(b.priority));
+  const overdue=projects.filter(p=>{if(!p.liveETA||p.liveETA==='NA')return false;return new Date(p.liveETA+'T00:00:00')<today&&p.status!=='Live';}).sort((a,b)=>pOrd(a.priority)-pOrd(b.priority));
   function prioSection(label,ps,col){
     if(!ps.length)return'<div class="text-muted">No '+label+' projects.</div>';
     return'<div class="twrap"><table><thead><tr><th>Initiative</th><th>Priority</th><th>Status</th><th>PM</th><th>Live ETA</th><th></th></tr></thead><tbody>'+ps.slice(0,20).map(p=>'<tr><td class="tr-name">'+((p.initiative||'—').replace(/</g,'&lt;'))+'</td><td><span class="badge '+pCls(p.priority)+'">'+p.priority+'</span></td><td><span class="badge '+sCls(p.status)+'">'+p.status+'</span></td><td>'+(p.pm||'—')+'</td><td>'+fmtD(p.liveETA)+'</td><td><button class="btn btn-g btn-xs" onclick="openModal(\''+p.id+'\')">Edit</button></td></tr>').join('')+'</tbody></table></div>'+(ps.length>20?'<div class="text-muted mt-8">+ '+(ps.length-20)+' more</div>':'');
