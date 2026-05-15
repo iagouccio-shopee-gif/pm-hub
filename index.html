@@ -221,6 +221,11 @@ body.no-session #bar,body.no-session #main{display:none;}
 .user-widget{display:flex;align-items:center;gap:6px;padding:0 4px;}
 .user-widget .user-name{font-size:12px;color:var(--bk);font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .user-widget .user-level{font-size:9px;background:var(--or);color:#fff;padding:2px 6px;border-radius:8px;font-weight:700;letter-spacing:.3px;}
+body.no-users .login-view{display:none;}
+body:not(.no-users) .bootstrap-view{display:none;}
+.bs-step.hidden{display:none;}
+.bs-tip{font-size:11px;background:#FFF3F0;padding:9px 11px;border-radius:6px;color:var(--bk);margin:10px 0 14px;line-height:1.5;}
+.bs-tip code{background:rgba(238,77,45,.15);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px;}
 .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px;}
 .prod-card{background:#FAFAFA;border-radius:var(--rs);padding:12px 14px;border-left:3px solid var(--or);transition:var(--tr);}
 .prod-card:hover{box-shadow:var(--sh);}
@@ -310,6 +315,7 @@ body.no-session #bar,body.no-session #main{display:none;}
 
 <div id="login-overlay" class="login-overlay">
 <div class="login-card">
+<div class="login-view">
 <div class="login-hd">🛒 Shopee PM Hub</div>
 <div class="login-sub">Sign in to continue</div>
 <div class="form-row"><label>User</label><select id="login-user"></select></div>
@@ -317,6 +323,26 @@ body.no-session #bar,body.no-session #main{display:none;}
 <div class="login-err" id="login-err"></div>
 <button class="btn btn-p login-btn" onclick="doLogin()">Sign in</button>
 <div class="login-note" id="login-note"></div>
+</div>
+<div class="bootstrap-view">
+<div class="bs-step bs-step-create">
+<div class="login-hd">🚀 First Run</div>
+<div class="login-sub">Create the initial L2 admin. After creation you'll download data.json to persist users via the repo.</div>
+<div class="form-row"><label>Display Name</label><input id="bs-name" placeholder="e.g. Iago Uccio"></div>
+<div class="form-row"><label>PM Identifier <span style="font-weight:normal;color:var(--gr)">(matches p.pm on projects)</span></label><input id="bs-pm" placeholder="e.g. Iago"></div>
+<div class="form-row"><label>Password</label><input type="password" id="bs-pwd" onkeydown="if(event.key==='Enter')doBootstrap()"></div>
+<div class="form-row"><label>Confirm Password</label><input type="password" id="bs-pwd2" onkeydown="if(event.key==='Enter')doBootstrap()"></div>
+<div class="login-err" id="bs-err"></div>
+<button class="btn btn-p login-btn" onclick="doBootstrap()">Create admin</button>
+</div>
+<div class="bs-step bs-step-download hidden">
+<div class="login-hd">✅ Admin Created</div>
+<div class="login-sub">Saved locally in this browser. Commit data.json to the repo so other devices see this user.</div>
+<div class="bs-tip">📦 Replace <code>data.json</code> in the repo with the downloaded file, then commit &amp; push.</div>
+<button class="btn btn-p login-btn" onclick="downloadData()">Download data.json</button>
+<button class="btn btn-g login-btn" style="margin-top:6px;" onclick="finishBootstrap()">Continue to app</button>
+</div>
+</div>
 </div></div>
 
 <div id="palette-bg" class="palette-bg hidden">
@@ -1123,19 +1149,49 @@ function applySessionUI(){
 }
 function populateLoginUsers(){
   const sel=document.getElementById('login-user');
-  const note=document.getElementById('login-note');
   if(!sel)return;
   if(users.length===0){
-    sel.innerHTML='<option>(No users configured)</option>';
-    sel.disabled=true;
-    document.getElementById('login-pwd').disabled=true;
-    if(note)note.textContent='No users yet. Bootstrap UI ships in the next commit.';
+    document.body.classList.add('no-users');
+    document.querySelector('.bs-step-create')?.classList.remove('hidden');
+    document.querySelector('.bs-step-download')?.classList.add('hidden');
+    setTimeout(()=>document.getElementById('bs-name')?.focus(),60);
     return;
   }
-  sel.disabled=false;
-  document.getElementById('login-pwd').disabled=false;
-  if(note)note.textContent='';
+  document.body.classList.remove('no-users');
   sel.innerHTML=users.map(u=>'<option value="'+u.id+'">'+u.name+' ('+u.level+')</option>').join('');
+}
+async function doBootstrap(){
+  const name=document.getElementById('bs-name').value.trim();
+  const pm=document.getElementById('bs-pm').value.trim();
+  const pwd=document.getElementById('bs-pwd').value;
+  const pwd2=document.getElementById('bs-pwd2').value;
+  const err=document.getElementById('bs-err');err.textContent='';
+  if(!name){err.textContent='Display name required';return;}
+  if(!pm){err.textContent='PM identifier required (scopes L1 users to projects)';return;}
+  if(pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
+  if(pwd!==pwd2){err.textContent='Passwords do not match';return;}
+  const hash=await sha256(pwd);
+  const u={id:uid(),name,level:'L2',pm,passwordHash:hash};
+  users.push(u);saveU();
+  session={userId:u.id,name:u.name,level:u.level,pm:u.pm};saveSession();
+  document.querySelector('.bs-step-create').classList.add('hidden');
+  document.querySelector('.bs-step-download').classList.remove('hidden');
+}
+function downloadData(){
+  const data={projects,team,tasks,users};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='data.json';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},100);
+  toast('data.json downloaded — commit it to the repo','success');
+}
+function finishBootstrap(){
+  document.body.classList.remove('no-users');
+  applySessionUI();
+  buildFilters();renderDashboard();rebuildPMSelects();
+  document.getElementById('nc-projects').textContent=projects.length;
+  toast('Welcome, '+session.name,'success');
 }
 async function doLogin(){
   const errEl=document.getElementById('login-err');errEl.textContent='';
