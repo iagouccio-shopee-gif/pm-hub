@@ -204,8 +204,23 @@ tbody td{padding:7px 10px;vertical-align:middle;}
 .task-owner{font-size:10px;padding:1px 7px;background:#F3F4F6;color:var(--dg);border-radius:20px;font-weight:700;white-space:nowrap;}
 .task-proj{font-size:10px;padding:1px 7px;background:var(--orbg);color:var(--or);border-radius:20px;font-weight:700;white-space:nowrap;}
 .task-del{background:none;border:none;color:var(--gr);cursor:pointer;font-size:16px;transition:var(--tr);}.task-del:hover{color:#B91C1C;}
-.admin-only{display:none;}body.admin-mode .admin-only{display:block;}body.admin-mode .admin-only.flex{display:flex;}
-.admin-banner{background:linear-gradient(135deg,#FFF3F0,#FFF8F6);border:1px solid rgba(238,77,45,.2);border-radius:var(--r);padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--or);font-weight:700;}
+.l2-only{display:none;}body.l2-mode .l2-only{display:block;}body.l2-mode .l2-only.flex{display:flex;}
+.l2-banner{background:linear-gradient(135deg,#FFF3F0,#FFF8F6);border:1px solid rgba(238,77,45,.2);border-radius:var(--r);padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--or);font-weight:700;}
+.login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#FF5722,#EE4D2D);display:none;align-items:center;justify-content:center;z-index:9999;}
+body.no-session .login-overlay{display:flex;}
+body.no-session #bar,body.no-session #main{display:none;}
+.login-card{background:#fff;border-radius:12px;padding:28px 32px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:340px;}
+.login-hd{font-family:var(--fh);font-size:22px;font-weight:800;color:var(--or);margin-bottom:2px;}
+.login-sub{font-size:12px;color:var(--gr);margin-bottom:18px;}
+.login-card .form-row{margin-bottom:12px;}
+.login-card .form-row label{display:block;font-size:11px;color:var(--gr);margin-bottom:4px;font-weight:600;}
+.login-card select,.login-card input{width:100%;}
+.login-btn{width:100%;margin-top:6px;}
+.login-err{color:#B91C1C;font-size:11px;min-height:14px;margin-bottom:6px;}
+.login-note{font-size:11px;color:var(--gr);margin-top:14px;text-align:center;line-height:1.4;}
+.user-widget{display:flex;align-items:center;gap:6px;padding:0 4px;}
+.user-widget .user-name{font-size:12px;color:var(--bk);font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.user-widget .user-level{font-size:9px;background:var(--or);color:#fff;padding:2px 6px;border-radius:8px;font-weight:700;letter-spacing:.3px;}
 .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px;}
 .prod-card{background:#FAFAFA;border-radius:var(--rs);padding:12px 14px;border-left:3px solid var(--or);transition:var(--tr);}
 .prod-card:hover{box-shadow:var(--sh);}
@@ -293,11 +308,16 @@ tbody td{padding:7px 10px;vertical-align:middle;}
 </head>
 <body>
 
-<div id="admin-modal" class="sm-modal-bg hidden">
-<div class="sm-modal"><div class="sm-modal-hd">🔒 Admin Access</div>
-<div class="sm-modal-body"><div class="form-row"><label>Password</label><input type="password" id="admin-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkAdminPwd()"></div>
-<div id="admin-err" style="color:#B91C1C;font-size:11px;margin-top:6px;"></div></div>
-<div class="sm-modal-ft"><button class="btn btn-g btn-sm" onclick="closeAdminModal()">Cancel</button><button class="btn btn-p btn-sm" onclick="checkAdminPwd()">Login</button></div></div></div>
+<div id="login-overlay" class="login-overlay">
+<div class="login-card">
+<div class="login-hd">🛒 Shopee PM Hub</div>
+<div class="login-sub">Sign in to continue</div>
+<div class="form-row"><label>User</label><select id="login-user"></select></div>
+<div class="form-row"><label>Password</label><input type="password" id="login-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+<div class="login-err" id="login-err"></div>
+<button class="btn btn-p login-btn" onclick="doLogin()">Sign in</button>
+<div class="login-note" id="login-note"></div>
+</div></div>
 
 <div id="palette-bg" class="palette-bg hidden">
 <div class="palette-box"><div class="pal-inp-row"><span class="pal-icon">🔍</span><input id="pal-input" placeholder="Search projects, jump to tab..." autocomplete="off" oninput="renderPalette()" onkeydown="palKey(event)"></div>
@@ -338,15 +358,14 @@ tbody td{padding:7px 10px;vertical-align:middle;}
 </nav>
 <div class="bar-right">
 <button class="bar-ib" title="Search (Ctrl+K)" onclick="openPalette()">🔍</button>
-<button class="bar-ib" title="Admin Access" onclick="showAdminModal()" id="admin-lock-btn">🔒</button>
-<span id="admin-badge" class="hidden">ADMIN</span>
+<div id="user-widget" class="user-widget"></div>
 <button class="bar-ib" title="Shortcuts (?)" onclick="showShortcuts()">⌨️</button>
 </div></div>
 
 <div id="main">
 <!-- DASHBOARD -->
 <div id="dashboard-tab" class="tab on">
-<div class="admin-only admin-banner">🔐 Admin Mode active — Productivity dashboard visible below.</div>
+<div class="l2-only l2-banner">🔓 L2 — Full Access. Productivity dashboard visible below.</div>
 <div class="stats-grid" id="dash-stats"></div>
 <div class="stats-grid stats-grid-sm" id="dash-ongoing"></div>
 <div class="dash-grid">
@@ -361,7 +380,7 @@ tbody td{padding:7px 10px;vertical-align:middle;}
 <div class="hm-legend" style="margin:0;"><span>Low</span><div class="hm-sw" style="background:#FFF3F0;"></div><div class="hm-sw" style="background:#FCA486;"></div><div class="hm-sw" style="background:#F27961;"></div><div class="hm-sw" style="background:#EE4D2D;"></div><span>High</span></div></div>
 <div class="hm-wrap" id="hm-body"></div>
 </div>
-<div class="card admin-only mt-12" id="admin-prod">
+<div class="card l2-only mt-12" id="admin-prod">
 <div class="ctitle">🔐 Team Productivity Dashboard</div>
 <div id="admin-prod-body"></div>
 </div>
@@ -1089,11 +1108,53 @@ function deleteReminder(rid){const p=projects.find(x=>x.id===editId);if(!p)retur
 function rteCmd(edId,cmd){document.getElementById(edId)?.focus();document.execCommand(cmd,false,null);}
 
 // ADMIN
-function showAdminModal(){if(sessionStorage.getItem('sph_admin')==='1'){logoutAdmin();return;}document.getElementById('admin-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('admin-pwd').focus(),100);}
-function closeAdminModal(){document.getElementById('admin-modal').classList.add('hidden');document.getElementById('admin-pwd').value='';document.getElementById('admin-err').textContent='';}
-function checkAdminPwd(){if(document.getElementById('admin-pwd').value==='admin123'){sessionStorage.setItem('sph_admin','1');document.body.classList.add('admin-mode');document.getElementById('admin-badge').classList.remove('hidden');document.getElementById('admin-lock-btn').textContent='🔓';closeAdminModal();renderDashboard();toast('Admin mode active 🔐','success');}else{document.getElementById('admin-err').textContent='Incorrect password';document.getElementById('admin-pwd').select();}}
-function logoutAdmin(){if(!confirm('Exit admin mode?'))return;sessionStorage.removeItem('sph_admin');document.body.classList.remove('admin-mode');document.getElementById('admin-badge').classList.add('hidden');document.getElementById('admin-lock-btn').textContent='🔒';toast('Admin mode off');}
-function initAdmin(){if(sessionStorage.getItem('sph_admin')==='1'){document.body.classList.add('admin-mode');document.getElementById('admin-badge').classList.remove('hidden');document.getElementById('admin-lock-btn').textContent='🔓';}}
+// LOGIN / SESSION
+function applySessionUI(){
+  if(session){
+    document.body.classList.remove('no-session');
+    document.body.classList.toggle('l2-mode',session.level==='L2');
+    const w=document.getElementById('user-widget');
+    if(w)w.innerHTML='<span class="user-name" title="'+session.name+'">'+session.name+'</span><span class="user-level">'+session.level+'</span><button class="bar-ib" title="Sign out" onclick="doLogout()">⏻</button>';
+  }else{
+    document.body.classList.add('no-session');
+    document.body.classList.remove('l2-mode');
+    const w=document.getElementById('user-widget');if(w)w.innerHTML='';
+  }
+}
+function populateLoginUsers(){
+  const sel=document.getElementById('login-user');
+  const note=document.getElementById('login-note');
+  if(!sel)return;
+  if(users.length===0){
+    sel.innerHTML='<option>(No users configured)</option>';
+    sel.disabled=true;
+    document.getElementById('login-pwd').disabled=true;
+    if(note)note.textContent='No users yet. Bootstrap UI ships in the next commit.';
+    return;
+  }
+  sel.disabled=false;
+  document.getElementById('login-pwd').disabled=false;
+  if(note)note.textContent='';
+  sel.innerHTML=users.map(u=>'<option value="'+u.id+'">'+u.name+' ('+u.level+')</option>').join('');
+}
+async function doLogin(){
+  const errEl=document.getElementById('login-err');errEl.textContent='';
+  if(!users.length){errEl.textContent='No users configured.';return;}
+  const userId=document.getElementById('login-user').value;
+  const pwd=document.getElementById('login-pwd').value;
+  const u=users.find(x=>x.id===userId);
+  if(!u){errEl.textContent='User not found.';return;}
+  const h=await sha256(pwd);
+  if(h!==u.passwordHash){errEl.textContent='Incorrect password.';document.getElementById('login-pwd').select();return;}
+  session={userId:u.id,name:u.name,level:u.level,pm:u.pm||''};
+  saveSession();
+  document.getElementById('login-pwd').value='';
+  applySessionUI();
+  buildFilters();renderDashboard();rebuildPMSelects();
+  document.getElementById('nc-projects').textContent=projects.length;
+  toast('Welcome, '+u.name,'success');
+}
+function doLogout(){if(!confirm('Sign out?'))return;session=null;saveSession();location.reload();}
 
 // COMMAND PALETTE
 let palIdx=0;
@@ -1123,15 +1184,17 @@ document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return;
   if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openPalette();return;}
   if(e.key==='?'){showShortcuts();return;}
-  if(e.key==='Escape'){['palette-bg','proj-modal','admin-modal','team-modal','shortcuts-modal'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));return;}
+  if(e.key==='Escape'){['palette-bg','proj-modal','team-modal','shortcuts-modal'].forEach(id=>document.getElementById(id)?.classList.add('hidden'));return;}
   if(e.key==='n'||e.key==='N'){if(document.querySelector('.tab.on')?.id==='projects-tab')openNewModal();}
 });
-['palette-bg','proj-modal','admin-modal','team-modal','shortcuts-modal'].forEach(id=>{document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add('hidden');});});
+['palette-bg','proj-modal','team-modal','shortcuts-modal'].forEach(id=>{document.getElementById(id)?.addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.add('hidden');});});
 document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap'))closeAllMS();});
 
 // INIT
 function init(){
-  initAdmin();buildFilters();renderDashboard();rebuildPMSelects();
+  applySessionUI();populateLoginUsers();
+  if(!session)return;
+  buildFilters();renderDashboard();rebuildPMSelects();
   document.getElementById('nc-projects').textContent=projects.length;
 }
 document.addEventListener('DOMContentLoaded',init);
