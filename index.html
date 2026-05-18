@@ -1588,21 +1588,17 @@ async function init(){
     // remote loaded but empty; local has data from pre-sync era — migrate up
     scheduleSync();
   }
-  // Auto-seed user list from team[] when empty (first run, or after a Reset)
-  if(!users.length)autoSeedUsers();
-  // Migration: fix L1/L2 inversion from pre-2026-05-18 seeds
-  // Old seed: admin=L2, team=L1. New: admin=L1, team=L2.
-  // Detect by checking if any non-admin has L1 with no passwordHash (old pattern)
-  (function migrateUserLevels(){
+  // Always add any missing team members to users[] (safe: skips existing by name)
+  autoSeedUsers();
+  // Ensure admin has L1; fix any stale seeds where admin was seeded as L2
+  (function ensureAdminLevel(){
     const adminTeam=team.filter(m=>m.type==='internal').find(m=>(m.level||2)===1);
-    const allL1noPass=users.filter(u=>u.level==='L1'&&!u.passwordHash);
-    const hasWrongSeed=allL1noPass.length>1;// more than 1 L1 with no password = old seed
-    if(!hasWrongSeed)return;
-    users.forEach(u=>{
-      const isAdmin=adminTeam&&u.name===adminTeam.name;
-      if(isAdmin){u.level='L1';}
-      else{u.level='L2';u.passwordHash='';}
-    });
+    if(!adminTeam)return;
+    const adminUser=users.find(u=>u.name===adminTeam.name);
+    if(!adminUser||adminUser.level==='L1')return;
+    adminUser.level='L1';
+    // Demote any non-admin that was incorrectly seeded as L1 with no password
+    users.forEach(u=>{if(u.name!==adminTeam.name&&u.level==='L1'&&!u.passwordHash)u.level='L2';});
     localStorage.setItem(STORE_USERS,JSON.stringify(users));
     if(session){session.level=users.find(u=>u.id===session.userId)?.level||session.level;saveSession();}
   })();
