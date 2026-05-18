@@ -1603,9 +1603,10 @@ async function init(){
     let changed=false;
     // Promote admin to L1 if needed
     if(adminUser&&adminUser.level!=='L1'){adminUser.level='L1';changed=true;}
-    // Demote any non-admin with no password that is still L1 or L2 (stale seed) to L3
+    // Demote non-admin L1-no-password users to L3 (old seed pattern where everyone was L1)
+    // Do NOT touch L2 — it is now an intentional designation
     users.forEach(u=>{
-      if(u.name!==adminTeam.name&&!u.passwordHash&&(u.level==='L1'||u.level==='L2')){u.level='L3';changed=true;}
+      if(u.name!==adminTeam.name&&!u.passwordHash&&u.level==='L1'){u.level='L3';changed=true;}
     });
     if(!changed)return;
     localStorage.setItem(STORE_USERS,JSON.stringify(users));
