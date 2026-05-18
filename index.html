@@ -203,8 +203,8 @@ tbody td{padding:7px 10px;vertical-align:middle;}
 .task-owner{font-size:10px;padding:1px 7px;background:#F3F4F6;color:var(--dg);border-radius:20px;font-weight:700;white-space:nowrap;}
 .task-proj{font-size:10px;padding:1px 7px;background:var(--orbg);color:var(--or);border-radius:20px;font-weight:700;white-space:nowrap;}
 .task-del{background:none;border:none;color:var(--gr);cursor:pointer;font-size:16px;transition:var(--tr);}.task-del:hover{color:#B91C1C;}
-.l2-only{display:none;}body.l2-mode .l2-only{display:block;}body.l2-mode .l2-banner{display:flex;}
-.l2-banner{background:linear-gradient(135deg,#FFF3F0,#FFF8F6);border:1px solid rgba(238,77,45,.2);border-radius:var(--r);padding:10px 16px;margin-bottom:14px;align-items:center;gap:10px;font-size:12px;color:var(--or);font-weight:700;}
+.l1-only{display:none;}body.l1-mode .l1-only{display:block;}body.l1-mode .l1-banner{display:flex;}
+.l1-banner{background:linear-gradient(135deg,#FFF3F0,#FFF8F6);border:1px solid rgba(238,77,45,.2);border-radius:var(--r);padding:10px 16px;margin-bottom:14px;align-items:center;gap:10px;font-size:12px;color:var(--or);font-weight:700;}
 .login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#FF5722,#EE4D2D);display:none;align-items:center;justify-content:center;z-index:9999;}
 body.no-session .login-overlay{display:flex;}
 body.no-session #bar,body.no-session #main{display:none;}
@@ -393,8 +393,8 @@ body.readonly .readonly-banner{display:block;}
 <div class="sm-modal-body">
 <div class="form-row mb-8"><label>Display Name *</label><input type="text" id="um-name" placeholder="e.g. Iago Uccio"></div>
 <div class="form-row mb-8"><label>PM Identifier <span style="font-weight:normal;color:var(--gr)">(matches p.pm — leave empty for read-only L1)</span></label><input type="text" id="um-pm" placeholder="e.g. Iago"></div>
-<div class="form-row mb-8"><label>Level *</label><select id="um-level" onchange="onUserLevelChange()"><option value="L1">L1 — Regular PM (no password, scoped to own projects)</option><option value="L2">L2 — Admin (password required, full access)</option></select></div>
-<div class="form-row mb-8" id="um-pwd-row"><label>Password <span style="font-weight:normal;color:var(--gr)" id="um-pwd-hint">(L2 only)</span></label><input type="password" id="um-pwd" placeholder="min 4 chars"></div>
+<div class="form-row mb-8"><label>Level *</label><select id="um-level" onchange="onUserLevelChange()"><option value="L2">L2 — Team Leader (no password, full project view)</option><option value="L1">L1 — Director/GPM (password required, full access)</option></select></div>
+<div class="form-row mb-8" id="um-pwd-row"><label>Password <span style="font-weight:normal;color:var(--gr)" id="um-pwd-hint">(L1 only)</span></label><input type="password" id="um-pwd" placeholder="min 4 chars"></div>
 <div id="um-err" style="color:#B91C1C;font-size:11px;margin-top:6px;"></div>
 </div>
 <div class="sm-modal-ft"><button class="btn btn-d btn-sm" id="um-del-btn" onclick="deleteUser()" style="display:none">Delete</button><button class="btn btn-g btn-sm" onclick="closeUserModal()">Cancel</button><button class="btn btn-p btn-sm" onclick="saveUser()">Save</button></div></div></div>
@@ -420,7 +420,7 @@ body.readonly .readonly-banner{display:block;}
 <button class="ntab" data-tab="team" onclick="showTab('team')">👥 Team</button>
 <button class="ntab" data-tab="tasks" onclick="showTab('tasks')">✅ Tasks</button>
 <button class="ntab" data-tab="reports" onclick="showTab('reports')">📈 Reports</button>
-<button class="ntab l2-only" data-tab="users" onclick="showTab('users')">👤 Users</button>
+<button class="ntab l1-only" data-tab="users" onclick="showTab('users')">👤 Users</button>
 </nav>
 <div class="bar-right">
 <button class="bar-ib" title="Search (Ctrl+K)" onclick="openPalette()">🔍</button>
@@ -432,7 +432,7 @@ body.readonly .readonly-banner{display:block;}
 <div id="main">
 <!-- DASHBOARD -->
 <div id="dashboard-tab" class="tab on">
-<div class="l2-only l2-banner">🔓 L2 — Full Access. Productivity dashboard visible below.</div>
+<div class="l1-only l1-banner">🔓 L1 — Full Access. Productivity dashboard visible below.</div>
 <div class="readonly-banner">👁 Read-only — your account has no PM identifier assigned. Ask an L2 to set yours to enable edits.</div>
 <div class="stats-grid" id="dash-stats"></div>
 <div class="stats-grid stats-grid-sm" id="dash-ongoing"></div>
@@ -448,7 +448,7 @@ body.readonly .readonly-banner{display:block;}
 <div class="hm-legend" style="margin:0;"><span>Low</span><div class="hm-sw" style="background:#FFF3F0;"></div><div class="hm-sw" style="background:#FCA486;"></div><div class="hm-sw" style="background:#F27961;"></div><div class="hm-sw" style="background:#EE4D2D;"></div><span>High</span></div></div>
 <div class="hm-wrap" id="hm-body"></div>
 </div>
-<div class="card l2-only mt-12" id="admin-prod">
+<div class="card l1-only mt-12" id="admin-prod">
 <div class="ctitle">🔐 Team Productivity Dashboard</div>
 <div id="admin-prod-body"></div>
 </div>
@@ -493,7 +493,7 @@ body.readonly .readonly-banner{display:block;}
 <!-- TEAM -->
 <div id="team-tab" class="tab">
 <div class="flex-between mb-12"><div style="font-family:var(--fh);font-weight:800;font-size:20px;color:var(--or);">👥 Team</div>
-<button class="btn btn-p btn-sm l2-only" onclick="openTeamModal()">+ Add Member</button></div>
+<button class="btn btn-p btn-sm l1-only" onclick="openTeamModal()">+ Add Member</button></div>
 <div class="team-grid" id="team-grid"></div>
 <div class="org-section" id="org-section"><div class="ctitle" style="margin-top:20px">🏢 Org Chart</div><div class="org-chart" id="org-chart"></div></div>
 </div>
@@ -692,9 +692,9 @@ async function savePatFromUI(){
 }
 function clearPat(){if(!confirm('Clear the GitHub PAT? Sync will stop until you set it again.'))return;savePat('');dataSha=null;setSyncStatus('idle');closePatModal();toast('PAT cleared','warn');}
 // L1/L2 SCOPE — vp() returns visible projects, canEdit(p) returns write permission, isReadOnly() flags L1 with no pm
-function vp(){if(!session)return[];if(session.level==='L2')return projects;if(!session.pm)return projects;return projects.filter(p=>p.pm===session.pm);}
-function canEdit(p){if(!session)return false;if(session.level==='L2')return true;if(!session.pm)return false;return!p||p.pm===session.pm;}
-function isReadOnly(){return!!session&&session.level==='L1'&&!session.pm;}
+function vp(){if(!session)return[];return projects;}
+function canEdit(p){if(!session)return false;if(session.level==='L1')return true;if(!session.pm)return false;return!p||p.pm===session.pm;}
+function isReadOnly(){return!!session&&session.level==='L2'&&!session.pm;}
 let projects=loadP(),team=loadT(),tasks=loadTasks(),users=loadU(),session=loadSession();
 let editId=null,teamEditId=null,sortCol='priority',sortDir=1,curView='table',rmGroup='pm';
 let MS={},customFilter=null,taskView='list';
@@ -779,9 +779,11 @@ function buildFilters(){
   '<div class="fg"><label>Priority</label>'+buildMS('priority','Priority',['P0','P1','P2','P3','To define'])+'</div>'+
   '<div class="fg"><label>PM</label>'+buildMS('pm','PM',pms)+'</div>'+
   '<div class="fg"><label>Line</label>'+buildMS('line','Line',lines)+'</div>'+
-  '<button class="btn btn-g btn-sm" onclick="clearAllFilters()" type="button">Clear</button>';
+  '<button class="btn btn-g btn-sm" onclick="clearAllFilters()" type="button">Clear</button>'+
+  (session&&session.level==='L2'&&session.pm?'<button class="btn btn-s btn-sm" onclick="filterMyProjects()" type="button">👤 Meus Projetos</button>':'');
 }
 function clearAllFilters(){customFilter=null;MS={};const s=document.getElementById('proj-search');if(s)s.value='';buildFilters();renderProjects();}
+function filterMyProjects(){if(!session||!session.pm)return;customFilter=p=>p.pm===session.pm;showTab('projects');renderProjects();}
 
 function setView(v){curView=v;['table','board','roadmap'].forEach(x=>{document.getElementById('view-'+x).classList.toggle('hidden',x!==v);document.getElementById('vbtn-'+x).classList.toggle('on',x===v);});renderProjects();}
 
@@ -962,7 +964,8 @@ function renderRoadmap(filtered){
 // DASHBOARD
 function renderDashboard(){
   const el=document.getElementById('dash-stats');if(!el)return;
-  const scope=vp();
+  // L2 (Team Leader): Dashboard stats scoped to own pm; L1 sees all
+  const scope=session&&session.level==='L2'&&session.pm?projects.filter(p=>p.pm===session.pm):projects;
   const today=new Date();today.setHours(0,0,0,0);
   const in30=new Date(today.getTime()+30*86400000);
   const ONGOING_ST=['Discovery','FRF','BRD','PRD','Dev','UAT','Live Testing','AB Testing'];
@@ -1036,7 +1039,7 @@ function renderHeatmap(){
 // ADMIN
 function renderAdminDash(){
   const el=document.getElementById('admin-prod-body');if(!el)return;
-  const today=new Date();
+  const today=new Date();today.setHours(0,0,0,0);
   const pmList=[...new Set(projects.filter(p=>!FROZEN.includes(p.status)&&p.status!=='Live').map(p=>p.pm).filter(Boolean))].sort();
   el.innerHTML='<div class="prod-grid">'+pmList.map(pm=>{
     const mp=projects.filter(p=>p.pm===pm&&!FROZEN.includes(p.status)&&p.status!=='Live');
@@ -1129,8 +1132,10 @@ function renderTasks(){
   if(taskView==='kanban'){renderTaskKanban();return;}
   const pEl=document.getElementById('tasks-pending');const dEl=document.getElementById('tasks-done');
   if(!pEl||!dEl)return;
-  const pending=tasks.filter(t=>!t.done),done=tasks.filter(t=>t.done);
-  if(!tasks.length){pEl.innerHTML=emptyState('✅','No tasks yet','Track action items here. Assign owners for accountability.','openAddTask()','Add Task');dEl.innerHTML='';return;}
+  // L2 (Team Leader): show only own tasks; L1 sees all
+  const taskScope=session&&session.level==='L2'&&session.pm?tasks.filter(t=>!t.owner||t.owner===session.pm):tasks;
+  const pending=taskScope.filter(t=>!t.done),done=taskScope.filter(t=>t.done);
+  if(!taskScope.length){pEl.innerHTML=emptyState('✅','No tasks yet','Track action items here. Assign owners for accountability.','openAddTask()','Add Task');dEl.innerHTML='';return;}
   pEl.innerHTML=pending.map(t=>taskHTML(t)).join('');
   dEl.innerHTML=done.length?'<div class="sub-hd mt-16 mb-8" style="color:var(--gr)">✓ Completed ('+done.length+')</div>'+done.map(t=>taskHTML(t)).join(''):'';
 }
@@ -1165,7 +1170,7 @@ function deleteTask(id){tasks=tasks.filter(x=>x.id!==id);saveTasks();renderTasks
 function renderReports(){
   const el=document.getElementById('reports-body');if(!el)return;
   const scope=vp();
-  const today=new Date();
+  const today=new Date();today.setHours(0,0,0,0);
   const high=scope.filter(p=>p.priority==='P0');
   const med=scope.filter(p=>p.priority==='P1'||p.priority==='P2');
   const low=scope.filter(p=>p.priority==='P3'||p.priority==='To define');
@@ -1196,7 +1201,7 @@ function openNewModal(){
   document.getElementById('rte-upd').innerHTML='';
   document.getElementById('updates-list').innerHTML='';
   document.getElementById('reminders-list').innerHTML='';
-  rebuildPMSelects(session&&session.level==='L1'?session.pm:null);
+  rebuildPMSelects(session&&session.level==='L2'?session.pm:null);
   document.getElementById('proj-modal').classList.remove('hidden');
   setTimeout(()=>document.getElementById('m-initiative').focus(),100);
 }
@@ -1216,7 +1221,7 @@ function openModal(id){
   document.getElementById('m-bizpic').value=p.businessLocalPic||'';
   document.getElementById('m-devpic').value=p.devPic||'';
   document.getElementById('m-desc').value=p.description||'';
-  const toISO=d=>{if(!d||d==='NA')return'';const x=new Date(d);return isNaN(x)?'':x.toISOString().slice(0,10);};
+  const toISO=d=>{if(!d||d==='NA')return'';const x=new Date(d+'T00:00:00');return isNaN(x)?'':d.slice(0,10);};
   document.getElementById('m-localeta').value=toISO(p.localETA);
   document.getElementById('m-liveeta').value=toISO(p.liveETA);
   document.getElementById('rte-upd').innerHTML='';
@@ -1232,7 +1237,7 @@ function saveModal(){
   if(editId&&!canEdit(existing)){toast('No permission to edit this project','error');return;}
   if(!editId&&isReadOnly()){toast('Read-only — cannot create','error');return;}
   let pmVal=document.getElementById('m-pm').value;
-  if(session&&session.level==='L1'&&session.pm)pmVal=session.pm;
+  if(session&&session.level==='L2'&&session.pm)pmVal=session.pm;
   const data={initiative:init,priority:document.getElementById('m-priority').value,status:document.getElementById('m-status').value,productLine:document.getElementById('m-line').value.trim(),businessObjective:document.getElementById('m-obj').value.trim(),pm:pmVal,businessLocalPic:document.getElementById('m-bizpic').value.trim(),devPic:document.getElementById('m-devpic').value.trim(),description:document.getElementById('m-desc').value.trim(),localETA:document.getElementById('m-localeta').value||'NA',liveETA:document.getElementById('m-liveeta').value||'NA'};
   if(editId){if(existing)Object.assign(existing,data);}
   else{projects.unshift(Object.assign({id:uid(),weeklyUpdates:[],reminders:[],starred:false,changelog:''},data));}
@@ -1241,7 +1246,7 @@ function saveModal(){
 function deleteProject(){if(!editId)return;const p=projects.find(x=>x.id===editId);if(!canEdit(p)){toast('No permission to delete this project','error');return;}if(!confirm('Delete this project? Cannot undo.'))return;projects=projects.filter(x=>x.id!==editId);saveP();closeModal();renderProjects();renderDashboard();toast('Deleted');}
 function rebuildPMSelects(current){
   const sel=document.getElementById('m-pm');if(!sel)return;
-  if(session&&session.level==='L1'&&session.pm){
+  if(session&&session.level==='L2'&&session.pm){
     sel.innerHTML='<option value="'+session.pm+'" selected>'+session.pm+'</option>';
     sel.disabled=true;
     return;
@@ -1304,14 +1309,14 @@ function rteCmd(edId,cmd){document.getElementById(edId)?.focus();document.execCo
 function applySessionUI(){
   if(session){
     document.body.classList.remove('no-session');
-    document.body.classList.toggle('l2-mode',session.level==='L2');
     document.body.classList.toggle('l1-mode',session.level==='L1');
+    document.body.classList.toggle('l2-mode',session.level==='L2');
     document.body.classList.toggle('readonly',isReadOnly());
     const w=document.getElementById('user-widget');
     if(w)w.innerHTML='<span class="user-name" title="'+session.name+'">'+session.name+'</span><span class="user-level">'+session.level+'</span><button class="bar-ib" title="Sign out" onclick="doLogout()">⏻</button>';
   }else{
     document.body.classList.add('no-session');
-    document.body.classList.remove('l2-mode','l1-mode','readonly');
+    document.body.classList.remove('l1-mode','l2-mode','readonly');
     const w=document.getElementById('user-widget');if(w)w.innerHTML='';
   }
 }
@@ -1341,16 +1346,16 @@ function onLoginUserChange(){
   if(!u||!pwdRow||!hint||!btn)return;
   document.getElementById('login-pwd').value='';
   document.getElementById('login-pwd2').value='';
-  if(u.level==='L1'){
+  if(u.level==='L2'){
     pwdRow.style.display='none';
     pwd2Row.style.display='none';
-    hint.textContent='Direct access — no password required for L1';
+    hint.textContent='Direct access — no password required for L2';
     btn.textContent='Enter as '+u.name;
-  }else if(u.level==='L2'&&!u.passwordHash){
+  }else if(u.level==='L1'&&!u.passwordHash){
     pwdRow.style.display='';
     pwd2Row.style.display='';
     pwdLabel.textContent='Set password';
-    hint.textContent='First sign-in as admin — choose a password (min 4 chars)';
+    hint.textContent='First sign-in as director — choose a password (min 4 chars)';
     btn.textContent='Set password & sign in';
     setTimeout(()=>document.getElementById('login-pwd')?.focus(),40);
   }else{
@@ -1375,7 +1380,7 @@ async function doBootstrap(){
   if(pwd!==pwd2){err.textContent='Passwords do not match';return;}
   const btn=document.querySelector('.bs-step-create .login-btn');if(btn){btn.disabled=true;btn.textContent='Creating...';}
   const hash=await sha256(pwd);
-  const u={id:uid(),name,level:'L2',pm,passwordHash:hash};
+  const u={id:uid(),name,level:'L1',pm,passwordHash:hash};
   users.push(u);localStorage.setItem(STORE_USERS,JSON.stringify(users));
   session={userId:u.id,name:u.name,level:u.level,pm:u.pm};saveSession();
   const ok=await ghSave();
@@ -1404,15 +1409,15 @@ async function doLogin(){
   const userId=document.getElementById('login-user').value;
   const u=users.find(x=>x.id===userId);
   if(!u){errEl.textContent='User not found.';return;}
-  if(u.level==='L2'&&!u.passwordHash){
-    // First-time admin sign-in — set password
+  if(u.level==='L1'&&!u.passwordHash){
+    // First-time director sign-in — set password
     const pwd=document.getElementById('login-pwd').value;
     const pwd2=document.getElementById('login-pwd2').value;
     if(pwd.length<4){errEl.textContent='Password must be at least 4 characters';return;}
     if(pwd!==pwd2){errEl.textContent='Passwords do not match';return;}
     u.passwordHash=await sha256(pwd);
     saveU();
-  }else if(u.level==='L2'){
+  }else if(u.level==='L1'){
     const pwd=document.getElementById('login-pwd').value;
     const h=await sha256(pwd);
     if(h!==u.passwordHash){errEl.textContent='Incorrect password.';document.getElementById('login-pwd').select();return;}
@@ -1437,7 +1442,7 @@ function renderUsers(){
     users.map(u=>{
       const isMe=session&&u.id===session.userId;
       return'<tr><td><strong>'+u.name+'</strong>'+(isMe?' <span class="user-level">YOU</span>':'')+'</td>'+
-        '<td><span class="lvl-badge lvl-'+(u.level==='L2'?1:2)+'">'+u.level+'</span></td>'+
+        '<td><span class="lvl-badge lvl-'+(u.level==='L1'?1:2)+'">'+u.level+'</span></td>'+
         '<td>'+(u.pm?u.pm:'<span class="text-muted">— (read-only)</span>')+'</td>'+
         '<td><button class="btn btn-g btn-xs" onclick="openUserModal(\''+u.id+'\')">Edit</button></td></tr>';
     }).join('')+'</tbody></table></div>';
@@ -1464,13 +1469,13 @@ function onUserLevelChange(){
   const hint=document.getElementById('um-pwd-hint');
   const u=userEditId?users.find(x=>x.id===userEditId):null;
   if(!row||!hint)return;
-  if(level==='L1'){
+  if(level==='L2'){
     row.style.display='none';
   }else{
     row.style.display='';
-    if(u&&u.level==='L1')hint.textContent='(required — upgrading to L2)';
+    if(u&&u.level==='L2')hint.textContent='(required — upgrading to L1)';
     else if(u)hint.textContent='(leave empty to keep current)';
-    else hint.textContent='(required for L2)';
+    else hint.textContent='(required for L1)';
   }
 }
 function closeUserModal(){document.getElementById('user-modal').classList.add('hidden');userEditId=null;}
@@ -1482,21 +1487,21 @@ async function saveUser(){
   const err=document.getElementById('um-err');err.textContent='';
   if(!name){err.textContent='Name required';return;}
   if(level!=='L1'&&level!=='L2'){err.textContent='Invalid level';return;}
-  if(level==='L2'){
+  if(level==='L1'){
     const existing=userEditId?users.find(x=>x.id===userEditId):null;
-    const needsPwd=!existing||existing.level==='L1'||!existing.passwordHash;
-    if(needsPwd&&pwd.length<4){err.textContent='Password (4+ chars) required for L2';return;}
+    const needsPwd=!existing||existing.level==='L2'||!existing.passwordHash;
+    if(needsPwd&&pwd.length<4){err.textContent='Password (4+ chars) required for L1';return;}
     if(pwd&&pwd.length<4){err.textContent='Password must be at least 4 characters';return;}
   }
   if(userEditId){
     const u=users.find(x=>x.id===userEditId);
     if(!u){err.textContent='User not found';return;}
     u.name=name;u.pm=pm;u.level=level;
-    if(level==='L1')u.passwordHash='';
+    if(level==='L2')u.passwordHash='';
     else if(pwd)u.passwordHash=await sha256(pwd);
     if(session&&u.id===session.userId){session.name=name;session.level=level;session.pm=pm;saveSession();applySessionUI();}
   }else{
-    const hash=level==='L2'?await sha256(pwd):'';
+    const hash=level==='L1'?await sha256(pwd):'';
     users.push({id:uid(),name,level,pm,passwordHash:hash});
   }
   saveU();closeUserModal();renderUsers();toast('User saved','success');
@@ -1550,12 +1555,12 @@ function autoSeedUsers(){
   const internal=team.filter(m=>m.type==='internal');
   if(!internal.length)return false;
   const adminTeam=internal.find(m=>(m.level||2)===1)||internal[0];
-  const hasL2=users.some(u=>u.level==='L2');
+  const hasL1=users.some(u=>u.level==='L1');
   let added=false;
   internal.forEach(m=>{
     if(users.find(u=>u.name===m.name))return;
     const isAdmin=m.id===adminTeam.id;
-    users.push({id:uid(),name:m.name,pm:m.name,level:(isAdmin&&!hasL2)?'L2':'L1',passwordHash:''});
+    users.push({id:uid(),name:m.name,pm:m.name,level:(isAdmin&&!hasL1)?'L1':'L2',passwordHash:''});
     added=true;
   });
   if(added){localStorage.setItem(STORE_USERS,JSON.stringify(users));scheduleSync();}
