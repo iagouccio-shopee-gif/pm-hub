@@ -1600,10 +1600,14 @@ async function init(){
     const adminTeam=team.filter(m=>m.type==='internal').find(m=>(m.level||2)===1);
     if(!adminTeam)return;
     const adminUser=users.find(u=>u.name===adminTeam.name);
-    if(!adminUser||adminUser.level==='L1')return;
-    adminUser.level='L1';
-    // Demote any non-admin incorrectly seeded as L1 or L2 with no password to L3
-    users.forEach(u=>{if(u.name!==adminTeam.name&&!u.passwordHash&&(u.level==='L1'||u.level==='L2'))u.level='L3';});
+    let changed=false;
+    // Promote admin to L1 if needed
+    if(adminUser&&adminUser.level!=='L1'){adminUser.level='L1';changed=true;}
+    // Demote any non-admin with no password that is still L1 or L2 (stale seed) to L3
+    users.forEach(u=>{
+      if(u.name!==adminTeam.name&&!u.passwordHash&&(u.level==='L1'||u.level==='L2')){u.level='L3';changed=true;}
+    });
+    if(!changed)return;
     localStorage.setItem(STORE_USERS,JSON.stringify(users));
     if(session){session.level=users.find(u=>u.id===session.userId)?.level||session.level;saveSession();}
   })();
