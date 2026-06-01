@@ -232,6 +232,11 @@ body:not(.no-users) .bootstrap-view{display:none;}
 body.readonly .rw-only{display:none!important;}
 .readonly-banner{display:none;background:#FFFBEA;border:1px solid #FBBF24;border-radius:var(--r);padding:8px 14px;margin-bottom:12px;font-size:12px;color:#92400E;font-weight:600;}
 body.readonly .readonly-banner{display:block;}
+#pat-warning{display:none;position:fixed;top:0;left:0;right:0;z-index:9990;background:#B91C1C;color:#fff;font-size:12px;font-weight:600;padding:9px 16px;align-items:center;gap:10px;justify-content:center;}
+#pat-warning a{color:#FCA5A5;text-decoration:underline;cursor:pointer;}
+#pat-warning button{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;font-weight:700;}
+body.no-session #pat-warning{display:none!important;}
+
 .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px;}
 .prod-card{background:#FAFAFA;border-radius:var(--rs);padding:12px 14px;border-left:3px solid var(--or);transition:var(--tr);}
 .prod-card:hover{box-shadow:var(--sh);}
@@ -319,6 +324,12 @@ body.readonly .readonly-banner{display:block;}
 </style>
 </head>
 <body>
+
+<div id="pat-warning">
+  ⚠️ Sync não configurado — suas alterações ficam só neste browser e <strong>não serão vistas pelo time.</strong>
+  &nbsp;<a onclick="openPatModal()">Configurar agora →</a>
+  &nbsp;<button onclick="dismissPatWarning()">✕</button>
+</div>
 
 <div id="login-overlay" class="login-overlay">
 <div class="login-card">
@@ -667,7 +678,7 @@ async function savePatFromUI(){
   if(!v){err.textContent='Token required';return;}
   if(!v.startsWith('github_pat_')&&!v.startsWith('ghp_')){err.textContent='Invalid token format';return;}
   savePat(v);
-  closePatModal();
+  closePatModal();updatePatWarning();
   toast('PAT saved — testing sync...','success');
   const remote=await ghLoad();
   if(remote){
@@ -1447,6 +1458,19 @@ async function doLogin(){
 }
 function doLogout(){if(!confirm('Sign out?'))return;session=null;saveSession();location.reload();}
 const GOOGLE_CLIENT_ID='81953791376-p77tmmq9ojboo9cephtoqnl3pgptj2b1.apps.googleusercontent.com';
+function updatePatWarning(){
+  const el=document.getElementById('pat-warning');
+  if(!el)return;
+  const hasPat=!!loadPat();
+  const dismissed=sessionStorage.getItem('pat-warning-dismissed');
+  el.style.display=(!hasPat&&session&&!dismissed)?'flex':'none';
+  // empurra o conteúdo para baixo quando o banner está visível
+  document.getElementById('main').style.marginTop=el.style.display==='flex'?'40px':'';
+}
+function dismissPatWarning(){
+  sessionStorage.setItem('pat-warning-dismissed','1');
+  updatePatWarning();
+}
 function enterAsVisitante(){
   session={userId:'__visitante__',name:'Visitante',level:'visitante',pm:''};
   saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
@@ -1469,11 +1493,13 @@ function handleGoogleCredential(resp){
       session={userId:'__visitante__',name:'Visitante',level:'visitante',pm:''};
       saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
       document.getElementById('nc-projects').textContent=vp().length;
+      updatePatWarning();
       toast('Acesso como Visitante (email não cadastrado)','success');return;
     }
     session={userId:u.id,name:u.name,level:u.level,pm:u.pm||''};
     saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
     document.getElementById('nc-projects').textContent=vp().length;
+    updatePatWarning();
     toast('Bem-vindo, '+u.name,'success');
   }catch(e){const err=document.getElementById('login-err');if(err)err.textContent='Erro ao processar login Google.';}
 }
@@ -1654,7 +1680,7 @@ async function init(){
     localStorage.setItem(STORE_USERS,JSON.stringify(users));
     if(session){session.level=users.find(u=>u.id===session.userId)?.level||session.level;saveSession();}
   })();
-  applySessionUI();populateLoginUsers();initGoogleSignIn();
+  applySessionUI();populateLoginUsers();initGoogleSignIn();updatePatWarning();
   if(!session)return;
   buildFilters();renderDashboard();rebuildPMSelects();
   document.getElementById('nc-projects').textContent=vp().length;
