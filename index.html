@@ -327,7 +327,6 @@ body.readonly .readonly-banner{display:block;}
 <div class="login-sub">Entre com sua conta Shopee</div>
 <div class="login-err" id="login-err"></div>
 <div id="google-signin-btn" style="display:flex;justify-content:center;margin:12px 0 8px;"></div>
-<button class="btn btn-g login-btn" style="font-size:12px;color:#6B7280;" onclick="enterAsVisitante()">👁 Entrar como Visitante</button>
 <!-- hidden fields mantidos para compatibilidade com funções legadas -->
 <select id="login-user" style="display:none;"></select>
 <input type="password" id="login-pwd" style="display:none;">
@@ -1466,7 +1465,12 @@ function handleGoogleCredential(resp){
     const email=(payload.email||'').toLowerCase();
     const u=users.find(u=>u.email&&u.email.toLowerCase()===email);
     const err=document.getElementById('login-err');
-    if(!u){if(err)err.textContent='Email '+email+' não cadastrado. Peça ao L1 para vincular na aba Users.';return;}
+    if(!u){
+      session={userId:'__visitante__',name:'Visitante',level:'visitante',pm:''};
+      saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
+      document.getElementById('nc-projects').textContent=vp().length;
+      toast('Acesso como Visitante (email não cadastrado)','success');return;
+    }
     session={userId:u.id,name:u.name,level:u.level,pm:u.pm||''};
     saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
     document.getElementById('nc-projects').textContent=vp().length;
