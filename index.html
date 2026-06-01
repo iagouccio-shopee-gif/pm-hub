@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGoogleSignIn()"></script>
 <style>
 :root{--or:#EE4D2D;--ord:#D3422A;--orl:#F27961;--orbg:#FFF3F0;--yellow:#FFBB00;--gr:#B3B9C2;--dg:#616161;--bk:#1A1A1A;--grad:linear-gradient(135deg,#EE4D2D 0%,#F7A543 100%);--fh:'Nunito',system-ui,sans-serif;--fb:'Roboto',system-ui,sans-serif;--sh:0 2px 12px rgba(238,77,45,.10);--shl:0 8px 32px rgba(238,77,45,.16);--r:10px;--rs:6px;--tr:all .2s ease;--h:34px;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -330,6 +331,8 @@ body.readonly .readonly-banner{display:block;}
 <div class="login-hint" id="login-hint"></div>
 <div class="login-err" id="login-err"></div>
 <button class="btn btn-p login-btn" id="login-btn" onclick="doLogin()">Sign in</button>
+<div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;"><div style="flex:1;height:1px;background:#E5E7EB;"></div><span style="font-size:11px;color:#9CA3AF;">ou</span><div style="flex:1;height:1px;background:#E5E7EB;"></div></div>
+<div id="google-signin-btn" style="display:flex;justify-content:center;"></div>
 <div class="login-note" id="login-note"></div>
 </div>
 <div class="bootstrap-view">
@@ -393,6 +396,7 @@ body.readonly .readonly-banner{display:block;}
 <div class="sm-modal"><div class="sm-modal-hd" id="um-title">Add User</div>
 <div class="sm-modal-body">
 <div class="form-row mb-8"><label>Display Name *</label><input type="text" id="um-name" placeholder="e.g. Iago Uccio"></div>
+<div class="form-row mb-8"><label>Email Google <span style="font-weight:normal;color:var(--gr)">(para login com Google)</span></label><input type="email" id="um-email" placeholder="ex: iago@shopee.com"></div>
 <div class="form-row mb-8"><label>PM Identifier <span style="font-weight:normal;color:var(--gr)">(igual ao p.pm nos projetos — vazio = somente leitura)</span></label><input type="text" id="um-pm" placeholder="ex: Iago"></div>
 <div class="form-row mb-8"><label>Level *</label><select id="um-level" onchange="onUserLevelChange()"><option value="L3">L3 — PM (senha, edita próprios projetos)</option><option value="L2">L2 — Team Leader (senha, edita próprios projetos)</option><option value="L1">L1 — Director/GPM (senha, acesso total)</option></select></div>
 <div class="form-row mb-8" id="um-pwd-row"><label>Password <span style="font-weight:normal;color:var(--gr)" id="um-pwd-hint">(L1 only)</span></label><input type="password" id="um-pwd" placeholder="min 4 chars"></div>
@@ -1444,18 +1448,39 @@ async function doLogin(){
   toast('Bem-vindo, '+u.name,'success');
 }
 function doLogout(){if(!confirm('Sign out?'))return;session=null;saveSession();location.reload();}
+const GOOGLE_CLIENT_ID='81953791376-p77tmmq9ojboo9cephtoqnl3pgptj2b1.apps.googleusercontent.com';
+function initGoogleSignIn(){
+  if(!window.google)return;
+  google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:handleGoogleCredential,auto_select:false,cancel_on_tap_outside:true});
+  const el=document.getElementById('google-signin-btn');
+  if(el)google.accounts.id.renderButton(el,{theme:'outline',size:'large',width:276,text:'signin_with',locale:'pt-BR'});
+}
+function handleGoogleCredential(resp){
+  try{
+    const payload=JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    const email=(payload.email||'').toLowerCase();
+    const u=users.find(u=>u.email&&u.email.toLowerCase()===email);
+    const err=document.getElementById('login-err');
+    if(!u){if(err)err.textContent='Email '+email+' não cadastrado. Peça ao L1 para vincular na aba Users.';return;}
+    session={userId:u.id,name:u.name,level:u.level,pm:u.pm||''};
+    saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
+    document.getElementById('nc-projects').textContent=vp().length;
+    toast('Bem-vindo, '+u.name,'success');
+  }catch(e){const err=document.getElementById('login-err');if(err)err.textContent='Erro ao processar login Google.';}
+}
 
 // USER MANAGEMENT (L2 only)
 let userEditId=null;
 function renderUsers(){
   const el=document.getElementById('users-body');if(!el)return;
   if(!users.length){el.innerHTML='<div class="text-muted">No users yet.</div>';return;}
-  el.innerHTML='<div class="twrap"><table><thead><tr><th>Name</th><th>Level</th><th>PM Identifier</th><th></th></tr></thead><tbody>'+
+  el.innerHTML='<div class="twrap"><table><thead><tr><th>Name</th><th>Level</th><th>PM Identifier</th><th>Email Google</th><th></th></tr></thead><tbody>'+
     users.map(u=>{
       const isMe=session&&u.id===session.userId;
       return'<tr><td><strong>'+u.name+'</strong>'+(isMe?' <span class="user-level">YOU</span>':'')+'</td>'+
         '<td><span class="lvl-badge lvl-'+(u.level==='L1'?1:u.level==='L2'?2:3)+'">'+u.level+'</span></td>'+
         '<td>'+(u.pm?u.pm:'<span class="text-muted">— (read-only)</span>')+'</td>'+
+        '<td>'+(u.email?'<span style="color:#059669;font-size:11px;">✓ '+u.email+'</span>':'<span class="text-muted" style="font-size:11px;">não vinculado</span>')+'</td>'+
         '<td><button class="btn btn-g btn-xs" onclick="openUserModal(\''+u.id+'\')">Edit</button></td></tr>';
     }).join('')+'</tbody></table></div>';
 }
@@ -1464,6 +1489,7 @@ function openUserModal(id){
   const u=id?users.find(x=>x.id===id):null;
   document.getElementById('um-title').textContent=id?'Edit User':'Add User';
   document.getElementById('um-name').value=u?.name||'';
+  document.getElementById('um-email').value=u?.email||'';
   document.getElementById('um-pm').value=u?.pm||'';
   document.getElementById('um-level').value=u?.level||'L1';
   document.getElementById('um-pwd').value='';
@@ -1489,6 +1515,7 @@ function onUserLevelChange(){
 function closeUserModal(){document.getElementById('user-modal').classList.add('hidden');userEditId=null;}
 async function saveUser(){
   const name=document.getElementById('um-name').value.trim();
+  const email=document.getElementById('um-email').value.trim().toLowerCase();
   const pm=document.getElementById('um-pm').value.trim();
   const level=document.getElementById('um-level').value;
   const pwd=document.getElementById('um-pwd').value;
@@ -1502,12 +1529,12 @@ async function saveUser(){
   if(userEditId){
     const u=users.find(x=>x.id===userEditId);
     if(!u){err.textContent='Usuário não encontrado';return;}
-    u.name=name;u.pm=pm;u.level=level;
+    u.name=name;u.email=email;u.pm=pm;u.level=level;
     if(pwd)u.passwordHash=await sha256(pwd);
     if(session&&u.id===session.userId){session.name=name;session.level=level;session.pm=pm;saveSession();applySessionUI();}
   }else{
     const hash=pwd?await sha256(pwd):'';
-    users.push({id:uid(),name,level,pm,passwordHash:hash});
+    users.push({id:uid(),name,email,level,pm,passwordHash:hash});
   }
   saveU();closeUserModal();renderUsers();toast('User saved','success');
 }
