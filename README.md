@@ -1,18 +1,20 @@
 # PM Hub — Shopee Challenge
 
-Ferramenta interna single-file (HTML + localStorage) com gestão de projetos, time, tasks e roadmap. Este fork adiciona multi-usuário (L1/L2), correções de bugs e sync com GitHub para uso colaborativo.
+Ferramenta interna single-file (HTML + CSS + JS inline) com gestão de projetos, time, tasks e roadmap. Fork com correções de bugs, multi-usuário (L1/L2/L3), login via Google e sync com GitHub.
 
 **Live:** https://iagouccio-shopee-gif.github.io/pm-hub/
 
 ---
 
-## O que foi feito
+## Stack
 
-- [x] Baseline original importado
-- [x] Bugs de timezone corrigidos (4 funções)
-- [x] Multi-login L1/L2 implementado
-- [x] GitHub sync funcionando (Contents API + PAT no localStorage)
-- [x] README com prompts documentados
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | HTML + CSS + JS inline (single file, zero dependências) |
+| Persistência | `data.json` no GitHub via Contents API |
+| Auth | Google Identity Services (GIS) |
+| Hosting | GitHub Pages |
+| Sync | GitHub Contents API + PAT fine-grained |
 
 ---
 
@@ -29,7 +31,7 @@ Ferramenta interna single-file (HTML + localStorage) com gestão de projetos, ti
 ---
 
 ### Bug 2 — `today` sem zerar horas em `renderAdminDash()`
-**Problema:** `const today = new Date()` carrega a hora atual. Às 15h, um projeto com `liveETA = hoje` aparece como overdue no painel de produtividade do L1, pois `T00:00:00 < 15:00:00`.
+**Problema:** `const today = new Date()` carrega a hora atual. Às 15h, um projeto com `liveETA = hoje` aparece como overdue no painel de produtividade do L1.
 
 **Prompt usado:**
 > "Em `renderAdminDash()`, a variável `today` é criada com `new Date()` mas nunca tem as horas zeradas. Isso faz projetos com ETA hoje aparecerem como overdue durante o dia. Adicione `today.setHours(0,0,0,0)` logo após a criação da variável. Não altere mais nada nessa função."
@@ -39,7 +41,7 @@ Ferramenta interna single-file (HTML + localStorage) com gestão de projetos, ti
 ---
 
 ### Bug 3 — `today` sem zerar horas em `renderReports()`
-**Problema:** Mesmo problema do Bug 2, mas na aba Reports — a tabela "Overdue Projects" marca projetos com ETA hoje como atrasados durante o dia.
+**Problema:** Mesmo problema do Bug 2 na aba Reports.
 
 **Prompt usado:**
 > "Mesma correção do bug anterior, agora em `renderReports()`. Adicione `today.setHours(0,0,0,0)` após `const today = new Date()`. Escopo: apenas essa linha nessa função."
@@ -49,10 +51,10 @@ Ferramenta interna single-file (HTML + localStorage) com gestão de projetos, ti
 ---
 
 ### Bug 4 — Data recua um dia ao abrir modal de edição (`toISO`)
-**Problema:** Dentro de `openModal()`, a função `toISO` usa `new Date(d)` sem sufixo, convertendo a data para UTC antes de retornar o ISO string. No fuso -3, `2025-11-27` vira `2025-11-26` no campo de edição.
+**Problema:** Dentro de `openModal()`, a função `toISO` usa `new Date(d)` sem sufixo, convertendo a data para UTC. No fuso -3, `2025-11-27` vira `2025-11-26` no campo de edição.
 
 **Prompt usado:**
-> "Em `openModal()`, a função inline `toISO` converte datas para o campo `input[type=date]`. Ela usa `new Date(d)` sem sufixo de hora, causando o mesmo bug de timezone já corrigido em `getQ`. Corrija para usar `new Date(d + 'T00:00:00')` e retorne `d.slice(0, 10)` diretamente em vez de passar por `.toISOString()`. Altere apenas essa função inline."
+> "Em `openModal()`, a função inline `toISO` converte datas para o campo `input[type=date]`. Ela usa `new Date(d)` sem sufixo de hora, causando o mesmo bug de timezone já corrigido em `getQ`. Corrija para usar `new Date(d + 'T00:00:00')` e retorne `d.slice(0, 10)` diretamente. Altere apenas essa função inline."
 
 **Fix:** `const toISO = d => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : d.slice(0, 10); }`
 
@@ -60,64 +62,83 @@ Ferramenta interna single-file (HTML + localStorage) com gestão de projetos, ti
 
 ## Missão B — Multi-usuário
 
-### Arquitetura
+### Arquitetura de níveis
 
-Dois níveis de acesso controlados pelo campo `level` no objeto de usuário:
+| Badge | Nível | Quem | Acesso |
+|-------|-------|------|--------|
+| 🔴 L1 | Director/GPM | Matheus Mendes | Admin total — todos os projetos, aba Users, dashboard completo |
+| 🟠 L2 | Team Leader | Danilo L., Matheus T., Leandra, Lucas | Vê tudo, edita apenas próprios projetos |
+| 🔵 L3 | PM | Demais 9 membros | Vê tudo, edita apenas próprios projetos |
+| — | Visitante | Qualquer email fora do time | Somente leitura automático |
 
-| Nível | Quem é | Login | Acesso |
-|-------|--------|-------|--------|
-| **L1** | GPM / Diretor | Senha obrigatória | Tudo — projetos, tasks, painel admin, aba Users |
-| **L2** | Team Leader | Sem senha | Vê todos os projetos e tasks; edita apenas os próprios |
-| **L2 sem pm** | Visitante / Observer | Sem senha | Read-only completo — vê tudo, edita nada |
+### O que foi implementado
 
-O campo **PM Identifier** (configurável na aba Users pelo L1) é o vínculo entre o usuário e os projetos: um L2 com `pm = "Erika"` edita apenas projetos onde `p.pm === "Erika"`.
+**Login via Google (GIS)**
+- Botão "Fazer Login com o Google" — único método de entrada
+- Email não cadastrado entra automaticamente como Visitante (read-only)
+- Sem senha, sem dropdown de usuário
 
-### Dashboard filtrado para L2
+**Controle de acesso**
+- `vp()` — todos os níveis veem todos os projetos
+- `canEdit(p)` — L1 edita tudo; L2/L3 apenas `p.pm === session.pm`; visitante nunca edita
+- `isReadOnly()` — visitante ou usuário sem PM identifier
+- PM selector travado no modal para não-L1
 
-L2 vê no Dashboard as métricas do **próprio time** (Total, Live, Ongoing, ETAs). L1 vê o consolidado de todos os times.
+**Dashboard e Tasks filtrados**
+- L2/L3 veem métricas apenas do próprio time no Dashboard
+- Tasks filtradas por `owner === session.pm` para L2/L3
+- Botão "👤 Meus Projetos" na barra de filtros (só para L2/L3)
 
-### Botão "Meus Projetos"
+**Resistência a localStorage stale**
+- `autoSeedUsers()` — sempre roda no init, adiciona membros faltantes do team[]
+- `ensureAdminLevel()` — promove admin para L1 e corrige seeds incorretos para L3
 
-L2 tem um botão de atalho na barra de filtros que aplica `customFilter = p => p.pm === session.pm` em um clique — sem precisar navegar pelo filtro de PM manualmente.
+### Time configurado
 
-### Prompts usados
-
-**Estrutura de usuários e login:**
-> "Adicione um sistema de login ao PM Hub com dois níveis: L1 (GPM/Diretor, senha obrigatória, acesso total) e L2 (Team Leader, sem senha, acesso restrito). Crie a tela de login com dropdown de usuários. L2 entra direto ao selecionar o nome. L1 exige senha. Na primeira vez que L1 seleciona o nome, ele define a própria senha. Use SHA-256 via `crypto.subtle` para hash. Não altere `saveP()`, `saveT()`, `saveTasks()`, `uid()` nem nenhuma função de render existente."
-
-**Filtro de escopo L2:**
-> "Implemente a função `vp()` que retorna os projetos visíveis para o usuário logado: L1 retorna todos; L2 retorna apenas os projetos onde `p.pm === session.pm`. Crie também `canEdit(p)` e `isReadOnly()`. Use essas funções em `renderProjects()`, `renderDashboard()` e `renderTasks()`. Não modifique a lógica de salvamento."
-
-**Dashboard filtrado:**
-> "Em `renderDashboard()`, adicione uma constante `scope` no início da função: se o usuário for L2 com pm definido, filtra `projects` pelo pm dele; caso contrário usa `vp()`. Substitua os usos de `vp()` dentro dessa função por `scope`. Não altere `renderHeatmap()` nem `renderAdminDash()`."
-
-**Botão Meus Projetos:**
-> "Em `buildFilters()`, adicione após o botão Clear um botão '👤 Meus Projetos' que só aparece para usuários L2 com pm definido. Ao clicar, aplica `customFilter = p => p.pm === session.pm` e chama `renderProjects()`. Crie a função `filterMyProjects()` para isso."
-
-**Auto-seed de usuários:**
-> "Crie `autoSeedUsers()` que, ao detectar `users[]` vazio, itera sobre `team[]` interno e cria um usuário L2 para cada membro. O primeiro membro com `level === 1` no time recebe nível L1 (sem senha, será definida no primeiro login). Chame essa função no `init()` após carregar dados remotos."
+| Nome | Nível | Email |
+|------|-------|-------|
+| Matheus Mendes | L1 | matheus.mendes@shopee.com |
+| Danilo L. | L2 | danilo.leite@shopee.com |
+| Leandra | L2 | leandra.mieko@shopee.com |
+| Lucas | L2 | lucas.menegaldo@shopee.com |
+| Matheus T. | L2 | matheus.torresi@shopee.com |
+| Iago | L3 | iago.uccio@shopee.com |
+| Erika | L3 | erika.izawa@shopee.com |
+| Mauricio L. | L3 | mauricio.lambert@shopee.com |
+| Ricardo R | L3 | ricardo.rocha@shopee.com |
+| Tatiane Porto | L3 | tatiane.porto@shopee.com |
+| Vithoria | L3 | vithoria.vasconcelos@shopee.com |
+| William | L3 | william.azevedo@shopee.com |
+| Mateus R. | L3 | mateus.alvarenga@shopee.com |
+| Laecio Rodrigues | L3 | laecio.rodrigues@shopee.com |
 
 ---
 
-## Missão C — Como publicar
+## Missão C — Deploy e infraestrutura
 
-Veja [PUBLICAR.md](PUBLICAR.md) para o passo a passo completo com comparação de plataformas.
+### Hosting
+- **Plataforma:** GitHub Pages (gratuito, deploy automático a cada `git push`)
+- **URL:** https://iagouccio-shopee-gif.github.io/pm-hub/
 
----
+### Banco de dados
+- `data.json` no repositório é o banco de dados (projetos, tasks, team, users)
+- Leitura e escrita via GitHub Contents API
+- Indicador no header: ⚪ sem PAT · 🟡 salvando · 🟢 sincronizado · 🔴 erro
 
-## GitHub Sync
+### GitHub Sync
+- PAT armazenado no `localStorage` — nunca commitado no código
+- Debounce de 2s — evita múltiplas requisições em edições rápidas
+- Retry automático em conflito (HTTP 409/422)
+- PAT fine-grained: permissão `Contents: Read and write` neste repo, 30 dias
 
-O sync usa a [GitHub Contents API](https://docs.github.com/en/rest/repos/contents) para ler e gravar `data.json` no repositório:
-
-- **PAT armazenado no `localStorage`** — nunca commitado no código
-- **Debounce de 2s** — evita múltiplas requisições em edições rápidas
-- **Retry automático em conflito** — se dois usuários salvarem ao mesmo tempo (HTTP 409/422), o app busca o SHA atualizado e tenta novamente
-- **Indicador no header** — ⚪ não configurado · 🟡 salvando · 🟢 sincronizado · 🔴 erro
-
-Para configurar: clique no indicador ⚪ no header e cole o PAT fine-grained com permissão `Contents: Read and write` neste repositório.
+### Autenticação Google
+- Google Identity Services (GIS) — client-side, sem backend
+- Client ID configurado para `iagouccio-shopee-gif.github.io`
+- Email fora do time → sessão Visitante automática
 
 ---
 
 ## Como rodar localmente
 
 Abra `index.html` no navegador. Tudo roda client-side, sem dependências externas.
+Para o sync funcionar, configure o PAT clicando no indicador ⚪ no header.
