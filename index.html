@@ -324,16 +324,15 @@ body.readonly .readonly-banner{display:block;}
 <div class="login-card">
 <div class="login-view">
 <div class="login-hd">🛒 Shopee PM Hub</div>
-<div class="login-sub">Sign in to continue</div>
-<div class="form-row"><label>User</label><select id="login-user" onchange="onLoginUserChange()"></select></div>
-<div class="form-row" id="login-pwd-row"><label id="login-pwd-label">Password</label><input type="password" id="login-pwd" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
-<div class="form-row" id="login-pwd2-row" style="display:none;"><label>Confirm Password</label><input type="password" id="login-pwd2" placeholder="Repeat password" onkeydown="if(event.key==='Enter')doLogin()"></div>
-<div class="login-hint" id="login-hint"></div>
+<div class="login-sub">Entre com sua conta Shopee</div>
 <div class="login-err" id="login-err"></div>
-<button class="btn btn-p login-btn" id="login-btn" onclick="doLogin()">Sign in</button>
-<div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px;"><div style="flex:1;height:1px;background:#E5E7EB;"></div><span style="font-size:11px;color:#9CA3AF;">ou</span><div style="flex:1;height:1px;background:#E5E7EB;"></div></div>
-<div id="google-signin-btn" style="display:flex;justify-content:center;"></div>
-<div class="login-note" id="login-note"></div>
+<div id="google-signin-btn" style="display:flex;justify-content:center;margin:12px 0 8px;"></div>
+<button class="btn btn-g login-btn" style="font-size:12px;color:#6B7280;" onclick="enterAsVisitante()">👁 Entrar como Visitante</button>
+<!-- hidden fields mantidos para compatibilidade com funções legadas -->
+<select id="login-user" style="display:none;"></select>
+<input type="password" id="login-pwd" style="display:none;">
+<input type="password" id="login-pwd2" style="display:none;">
+<div id="login-hint" style="display:none;"></div>
 </div>
 <div class="bootstrap-view">
 <div class="bs-step bs-step-create">
@@ -1449,6 +1448,12 @@ async function doLogin(){
 }
 function doLogout(){if(!confirm('Sign out?'))return;session=null;saveSession();location.reload();}
 const GOOGLE_CLIENT_ID='81953791376-p77tmmq9ojboo9cephtoqnl3pgptj2b1.apps.googleusercontent.com';
+function enterAsVisitante(){
+  session={userId:'__visitante__',name:'Visitante',level:'visitante',pm:''};
+  saveSession();applySessionUI();buildFilters();renderDashboard();rebuildPMSelects();
+  document.getElementById('nc-projects').textContent=vp().length;
+  toast('Bem-vindo, Visitante','success');
+}
 function initGoogleSignIn(){
   if(!window.google)return;
   google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:handleGoogleCredential,auto_select:false,cancel_on_tap_outside:true});
@@ -1645,7 +1650,7 @@ async function init(){
     localStorage.setItem(STORE_USERS,JSON.stringify(users));
     if(session){session.level=users.find(u=>u.id===session.userId)?.level||session.level;saveSession();}
   })();
-  applySessionUI();populateLoginUsers();
+  applySessionUI();populateLoginUsers();initGoogleSignIn();
   if(!session)return;
   buildFilters();renderDashboard();rebuildPMSelects();
   document.getElementById('nc-projects').textContent=vp().length;
